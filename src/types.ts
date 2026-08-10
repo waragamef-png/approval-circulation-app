@@ -49,6 +49,16 @@ export interface HistoryEntry {
   createdAt: string;
 }
 
+export interface CaseDocument {
+  id: string;
+  fileId: string;
+  name: string;
+  type: string;
+  location: string;
+  fileUrl: string;
+  requiresStamp: boolean;
+}
+
 export interface CirculationCase {
   id: string;
   accessKey: string;
@@ -56,6 +66,7 @@ export interface CirculationCase {
   fileId: string;
   fileName: string;
   fileUrl: string;
+  documents: CaseDocument[];
   initiatorId: string;
   initiatorName: string;
   startedAt: string;

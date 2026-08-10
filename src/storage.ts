@@ -11,6 +11,15 @@ export function loadData(): AppData {
     parsed.cases = parsed.cases.map((item) => ({
       ...item,
       accessKey: item.accessKey || crypto.randomUUID().replaceAll("-", ""),
+      documents: item.documents?.length ? item.documents : [{
+        id: item.fileId,
+        fileId: item.fileId,
+        name: item.fileName,
+        type: item.fileName.toLowerCase().endsWith(".pdf") ? "PDF" : "Excel",
+        location: "保存場所未設定",
+        fileUrl: item.fileUrl,
+        requiresStamp: item.members.some((member) => member.requiresStamp),
+      }],
     }));
     return parsed;
   } catch {

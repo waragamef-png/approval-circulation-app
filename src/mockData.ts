@@ -62,6 +62,10 @@ export const seedData: AppData = {
       fileId: "sp-001",
       fileName: "2026年度_製品仕様書.pdf",
       fileUrl: "#demo-document",
+      documents: [
+        { id: "doc-sp-001", fileId: "sp-001", name: "2026年度_製品仕様書.pdf", type: "PDF", location: "技術部 / 製品開発", fileUrl: "#demo-document", requiresStamp: true },
+        { id: "doc-sp-002", fileId: "sp-002", name: "品質検査チェックリスト.xlsx", type: "Excel", location: "品質保証部 / 品質文書", fileUrl: "#demo-document", requiresStamp: false },
+      ],
       initiatorId: "a-sato",
       initiatorName: "佐藤 花子",
       startedAt: "2026-08-10T09:00:00+09:00",
@@ -87,6 +91,9 @@ export const seedData: AppData = {
       fileId: "od-001",
       fileName: "設備投資申請書.xlsx",
       fileUrl: "#demo-document",
+      documents: [
+        { id: "doc-od-001", fileId: "od-001", name: "設備投資申請書.xlsx", type: "Excel", location: "マイファイル / 申請書", fileUrl: "#demo-document", requiresStamp: true },
+      ],
       initiatorId: "a-fujiwara",
       initiatorName: "藤原 美咲",
       startedAt: "2026-08-08T13:00:00+09:00",
