@@ -375,9 +375,9 @@ select:focus, .form-grid input:focus, .form-grid textarea:focus, .comment-field 
 .progress-summary p { margin: 0; color: var(--muted); font-size: 11px; }
 .timeline { padding: 0 24px 22px; }
 .timeline-item { min-height: 82px; display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
-.timeline-marker { width: 28px; align-self: stretch; position: relative; display: grid; place-items: center; }
+.timeline-marker { width: 28px; align-self: stretch; position: relative; display: flex; align-items: flex-start; justify-content: center; padding-top: 4px; }
 .timeline-marker span { z-index: 1; width: 26px; height: 26px; display: grid; place-items: center; border: 2px solid #cdd3db; border-radius: 50%; color: #7d8796; background: white; font-size: 10px; font-weight: 700; }
-.timeline-marker i { position: absolute; left: 13px; top: calc(50% + 12px); bottom: calc(-50% + 12px); border-left: 1px dashed #c4cbd4; }
+.timeline-marker i { position: absolute; left: 13px; top: 34px; bottom: -16px; border-left: 1px dashed #c4cbd4; }
 .timeline-item.approved .timeline-marker span, .timeline-item.stamped .timeline-marker span { border-color: var(--green); color: white; background: var(--green); }
 .timeline-item.current .timeline-marker span { border-color: var(--accent); color: var(--accent); background: #edf9ff; }
 .timeline-person { min-width: 0; flex: 1; }
