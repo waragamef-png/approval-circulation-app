@@ -2,6 +2,8 @@
 
 SharePoint、OneDrive、将来の社内共有フォルダに保存された業務ファイルを、案件ごとの専用URLで順番に承認回覧するWebアプリです。
 
+デモ版：<https://waragamef-png.github.io/approval-circulation-app/>
+
 現在はSTEP 1の完全ローカルUIモックとSTEP 2のGit管理用ファイル整備まで完了しています。Microsoft 365、実ファイル、実メールにはまだ接続していません。
 
 ## システム概要

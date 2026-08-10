@@ -16,7 +16,11 @@ type CaseTab = "waiting" | "all" | "returned" | "completed";
 type EmailDraft = { to: string; recipientName: string; subject: string; body: string; purpose: string };
 
 function readLocation(): { page: Page; caseId?: string } {
-  const path = window.location.pathname.replace(/\/$/, "") || "/";
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const pathname = basePath && window.location.pathname.startsWith(basePath)
+    ? window.location.pathname.slice(basePath.length)
+    : window.location.pathname;
+  const path = (window.location.hash.startsWith("#/") ? window.location.hash.slice(1) : pathname).replace(/\/$/, "") || "/";
   if (path.startsWith("/c/")) return { page: "case", caseId: decodeURIComponent(path.slice("/c/".length)) };
   if (path.startsWith("/cases/")) return { page: "case", caseId: decodeURIComponent(path.slice("/cases/".length)) };
   if (path === "/cases") return { page: "cases" };
@@ -26,8 +30,10 @@ function readLocation(): { page: Page; caseId?: string } {
 }
 
 function pathFor(page: Page, caseId?: string) {
-  if (page === "case" && caseId) return `/c/${encodeURIComponent(caseId)}`;
-  return ({ home: "/", approvers: "/approvers", new: "/circulations/new", cases: "/cases", case: "/cases" } as Record<Page, string>)[page];
+  const path = page === "case" && caseId
+    ? `/c/${encodeURIComponent(caseId)}`
+    : ({ home: "/", approvers: "/approvers", new: "/circulations/new", cases: "/cases", case: "/cases" } as Record<Page, string>)[page];
+  return import.meta.env.PROD ? `#${path}` : path;
 }
 
 const providerLabels: Record<ProviderType, string> = {
