@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Build and tool output
+dist/
+coverage/
+.vite/
+.wrangler/
+outputs/
+work/
+
+# Environment files and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.pfx
+*.key
+
+# Logs
+*.log
+.devserver.log
+.devserver.err.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
