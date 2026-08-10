@@ -79,7 +79,7 @@ function Avatar({ name, small = false }: { name: string; small?: boolean }) {
 
 function RouteTypeIcon({ requiresStamp }: { requiresStamp: boolean }) {
   const label = requiresStamp ? "捺印" : "確認";
-  return <span className={`route-type-icon ${requiresStamp ? "stamp" : "review"}`} title={label} aria-label={label}>{requiresStamp ? "印" : "✓"}</span>;
+  return <span className={`route-type-icon ${requiresStamp ? "stamp" : "review"}`} title={label} aria-label={label}>{label}</span>;
 }
 
 function StatusBadge({ state }: { state: CirculationCase["state"] }) {
@@ -389,20 +389,10 @@ function CaseDetail({ item, approvers, onBack, onChange, notify }: { item: Circu
   const stampDocuments = item.documents.filter((document) => document.requiresStamp);
   const needsStampNow = Boolean(current?.requiresStamp && stampDocuments.length > 0);
 
-  const copyCaseUrl = () => {
-    navigator.clipboard.writeText(window.location.href)
-      .then(() => notify("この案件の専用URLをコピーしました"))
-      .catch(() => notify("ブラウザのアドレス欄からURLをコピーしてください"));
-  };
   const openMailDraft = (to: string, subject: string, body: string) => {
     const recipient = approvers.find((person) => person.email === to) ?? item.members.find((member) => member.email === to);
     setEmailDraft({ to, recipientName: recipient?.name ?? to, subject, body, purpose: subject.includes("差し戻し") ? "差し戻し通知" : "回覧通知" });
   };
-  const createEmail = () => {
-    if (!reviewOwner || item.state === "completed") return;
-    setEmailDraft({ to: reviewOwner.email, recipientName: reviewOwner.name, purpose: "承認依頼", subject: `【承認依頼】${title}`, body: `${reviewOwner.name}さん\n\n以下の案件が承認待ちです。\n案件名：${title}\n文書数：${item.documents.length}件\n案件ID：${item.id}\n現在の確認者：${reviewOwner.name}\n対応内容：${needsStampNow ? `捺印対象${stampDocuments.length}件への捺印と全文書の確認` : "全文書の内容確認"}\n\n案件URL：\n${window.location.href}\n\n内容を確認し、案件ページから回付してください。` });
-  };
-
   const approve = () => {
     if (!current) return;
     const index = item.members.findIndex((member) => member.id === current.id);
@@ -428,17 +418,21 @@ function CaseDetail({ item, approvers, onBack, onChange, notify }: { item: Circu
   const systemHistory = item.history.filter((entry) => ["回覧開始", "再回覧", "回付ルート変更"].includes(entry.action));
   return <div className="page case-detail-page">
     <button className="back-button" onClick={onBack}>← 案件一覧へ戻る</button>
-    <PageHeading title={title} description={`${item.id} ・ 文書${item.documents.length}件 ・ ${providerLabels[item.provider]}`} actions={<><button className="secondary-button" onClick={copyCaseUrl}>URLをコピー</button>{item.state !== "completed" && <button className="primary-button" onClick={createEmail}>承認依頼メール</button>}<StatusBadge state={item.state} /></>} />
+    <PageHeading title={title} description={`${item.id} ・ 文書${item.documents.length}件 ・ ${providerLabels[item.provider]}`} />
     <section className={`current-reviewer-banner ${item.state === "completed" ? "is-completed" : ""}`}>
-      <div className="reviewer-symbol">{item.state === "completed" ? "✓" : "確"}</div>
+      <div className="reviewer-symbol">{item.state === "completed" ? "完了" : "確認"}</div>
       <div className="reviewer-copy"><strong>{item.state === "completed" ? "回覧完了" : reviewOwner ? `${reviewOwner.name}さんの承認待ち` : "現在の対応者"}</strong><p>{item.state === "completed" ? "すべての承認が完了しています。" : reviewOwner ? `${reviewOwner.department} ・ ${reviewOwner.email}` : "回覧開始者が対応します。"}</p></div>
       {item.state !== "completed" && <span className="identity-badge open-access">承認待ち</span>}
     </section>
     <div className="detail-grid">
       <div className="detail-main">
-        {canProcess && <section className={`action-panel ${needsStampNow ? "stamp" : "review"}`}><div className="action-heading"><span className="action-icon">{needsStampNow ? "印" : "✓"}</span><div><h2>{needsStampNow ? "捺印と確認をお願いします" : "文書を確認してください"}</h2><p>{needsStampNow ? `捺印対象${stampDocuments.length}件に捺印し、すべての文書を確認してください。` : `対象文書${item.documents.length}件を確認してください。`}</p></div></div><div className="action-buttons"><span className="mail-auto-note">処理後にメール下書きが開きます</span><span className="action-spacer" /><button className="danger-button" onClick={() => setRejecting(true)}>差し戻し</button><button className="primary-button" onClick={approve}>{needsStampNow ? "捺印・確認完了して回付" : "確認完了して回付"}</button></div></section>}
-        {canRestart && <section className="action-panel returned-action"><div className="action-heading"><span className="action-icon">↩</span><div><h2>開始者へ差し戻されています</h2><p>コメントと文書を確認し、先頭から再回覧できます。</p></div></div><div className="action-buttons"><span className="action-spacer" /><button className="primary-button" onClick={restart}>先頭から再回覧</button></div></section>}
-        <section className="panel case-document-panel"><div className="section-title"><h2>対象文書</h2><span className="result-count">{item.documents.length}件</span></div><div className="case-document-list">{item.documents.map((document) => { const stampRequired = Boolean(current?.requiresStamp && document.requiresStamp); return <div className="case-document-row" key={document.id}><span className={`file-icon ${fileClass(document.type)}`}>{fileLabel(document.type)}</span><div><strong>{document.name}</strong><small>{document.location}</small></div><span className={`document-kind ${stampRequired ? "stamp-kind" : ""}`}>{stampRequired ? "捺印対象" : "確認のみ"}</span><button className="document-button" onClick={() => notify(`確認用：${document.name} を開きました`)}>文書を開く</button></div>; })}</div></section>
+        <section className={`action-panel document-work-panel ${canProcess ? (needsStampNow ? "stamp" : "review") : canRestart ? "returned-action" : "document-only"}`}>
+          {canProcess && <div className="action-heading"><span className="action-icon">{needsStampNow ? "印" : "✓"}</span><div><h2>{needsStampNow ? "捺印と確認をお願いします" : "文書を確認してください"}</h2><p>{needsStampNow ? `捺印対象${stampDocuments.length}件に捺印し、すべての文書を確認してください。` : `対象文書${item.documents.length}件を確認してください。`}</p></div></div>}
+          {canRestart && <div className="action-heading"><span className="action-icon">↩</span><div><h2>開始者へ差し戻されています</h2><p>コメントと文書を確認し、先頭から再回覧できます。</p></div></div>}
+          <div className="embedded-documents"><div className="section-title"><h2>対象文書</h2><span className="result-count">{item.documents.length}件</span></div><div className="case-document-list">{item.documents.map((document) => { const stampRequired = Boolean(current?.requiresStamp && document.requiresStamp); return <div className="case-document-row" key={document.id}><span className={`file-icon ${fileClass(document.type)}`}>{fileLabel(document.type)}</span><div><strong>{document.name}</strong><small>{document.location}</small></div><span className={`document-kind ${stampRequired ? "stamp-kind" : ""}`}>{stampRequired ? "捺印対象" : "確認のみ"}</span><button className="document-button" onClick={() => notify(`確認用：${document.name} を開きました`)}>文書を開く</button></div>; })}</div></div>
+          {canProcess && <div className="action-buttons"><span className="mail-auto-note">処理後にメール下書きが開きます</span><span className="action-spacer" /><button className="danger-button" onClick={() => setRejecting(true)}>差し戻し</button><button className="primary-button" onClick={approve}>{needsStampNow ? "捺印・確認完了して回付" : "確認完了して回付"}</button></div>}
+          {canRestart && <div className="action-buttons"><span className="action-spacer" /><button className="primary-button" onClick={restart}>先頭から再回覧</button></div>}
+        </section>
         <section className="panel progress-panel"><div className="section-title"><h2>回付ルート・履歴</h2>{canEdit && <button className="secondary-button" onClick={() => setEditingRoute(true)}>未処理ルートを編集</button>}</div>
           <div className="progress-summary"><strong>{item.state === "completed" ? "100" : Math.round(doneCount / item.members.length * 100)}<small>%</small></strong><span><i style={{ width: `${item.state === "completed" ? 100 : Math.round(doneCount / item.members.length * 100)}%` }} /></span><p>{doneCount}/{item.members.length}名 完了</p></div>
           <div className="timeline">

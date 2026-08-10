@@ -232,7 +232,7 @@ select:focus, .form-grid input:focus, .form-grid textarea:focus, .comment-field 
 .route-type-control input { position: absolute; opacity: 0; pointer-events: none; }
 .route-type-control:focus-within .route-type-icon { outline: 3px solid rgba(35,152,209,.2); outline-offset: 2px; }
 .route-type-control:has(input:disabled) { cursor: not-allowed; opacity: .58; }
-.route-type-icon { width: 35px; height: 35px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #baddec; border-radius: 50%; color: #177daa; background: #e5f7ff; font-size: 14px; font-weight: 800; }
+.route-type-icon { width: 35px; height: 35px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #baddec; border-radius: 50%; color: #177daa; background: #e5f7ff; font-size: 9px; font-weight: 800; letter-spacing: -.04em; }
 .route-type-icon.stamp { border-color: #f0c9b9; color: #a64f2e; background: #ffede5; }
 .route-type-icon.review { color: #237c6d; background: #e8f7f2; border-color: #bde2d8; }
 .move-actions { display: flex; gap: 3px; }
@@ -319,7 +319,7 @@ select:focus, .form-grid input:focus, .form-grid textarea:focus, .comment-field 
 .current-reviewer-banner { display: flex; align-items: center; gap: 16px; margin: -8px 0 18px; padding: 17px 20px; border: 1px solid #9ed6ef; border-radius: 12px; background: #e8f7ff; box-shadow: 0 8px 22px rgba(42,132,177,.09); }
 .current-reviewer-banner.is-matched { border-color: #7fcdb8; background: #eaf9f4; }
 .current-reviewer-banner.is-completed { border-color: #b9ddd1; background: #f0faf6; }
-.reviewer-symbol { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--accent); font-family: Georgia, "Yu Mincho", serif; font-size: 16px; font-weight: 700; }
+.reviewer-symbol { width: 52px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--accent); font-size: 12px; font-weight: 700; }
 .is-matched .reviewer-symbol, .is-completed .reviewer-symbol { background: var(--green); }
 .reviewer-copy { min-width: 230px; }
 .reviewer-copy > strong { display: block; margin-top: 3px; color: var(--ink); font-family: Georgia, "Yu Mincho", serif; font-size: 18px; }
@@ -338,6 +338,9 @@ select:focus, .form-grid input:focus, .form-grid textarea:focus, .comment-field 
 .action-panel { overflow: hidden; border: 1px solid #d9e1eb; border-left: 4px solid var(--blue); border-radius: 12px; background: #f7faff; box-shadow: var(--shadow); }
 .action-panel.stamp { border-left-color: var(--accent); background: #f2fbff; }
 .returned-action { border-left-color: var(--danger); background: #fff8f8; }
+.document-work-panel.document-only { border-left-width: 1px; background: white; }
+.embedded-documents { border-top: 1px solid rgba(80,95,120,.12); background: white; }
+.document-work-panel.document-only .embedded-documents { border-top: 0; }
 .action-heading { display: flex; gap: 15px; padding: 21px 23px 17px; }
 .action-icon { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: #167aaa; background: #dff3fd; font-family: Georgia, serif; font-size: 17px; font-weight: 700; }
 .action-panel.review .action-icon { color: var(--blue); background: #e4edf9; }
@@ -487,8 +490,9 @@ select:focus, .form-grid input:focus, .form-grid textarea:focus, .comment-field 
   .route-footer { align-items: stretch; flex-direction: column; gap: 10px; }
   .start-section { align-items: stretch; flex-direction: column; padding: 19px 16px; }
   .start-section .primary-button { width: 100%; min-width: 0; }
-  .current-reviewer-banner { align-items: flex-start; padding: 16px; }
-  .identity-badge { margin-left: auto; }
+  .current-reviewer-banner { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: flex-start; gap: 12px; padding: 16px; }
+  .reviewer-copy { min-width: 0; }
+  .identity-badge { grid-column: 2; justify-self: start; margin-left: 0; }
   .action-heading { padding: 18px 16px 14px; }
   .action-buttons { align-items: stretch; flex-direction: column; padding: 12px 16px 16px; }
   .action-spacer { display: none; }
