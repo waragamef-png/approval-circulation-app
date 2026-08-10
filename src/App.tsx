@@ -122,6 +122,7 @@ export default function App() {
   const [page, setPage] = useState<Page>(initialLocation.page);
   const [selectedCaseId, setSelectedCaseId] = useState<string | undefined>(initialLocation.caseId);
   const [toast, setToast] = useState<string>();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => saveData(data), [data]);
   useEffect(() => {
@@ -129,6 +130,7 @@ export default function App() {
       const next = readLocation();
       setPage(next.page);
       setSelectedCaseId(next.caseId);
+      setMobileMenuOpen(false);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -138,6 +140,18 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(undefined), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    document.body.classList.add("menu-open");
+    window.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.body.classList.remove("menu-open");
+      window.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [mobileMenuOpen]);
 
   const currentUser = data.approvers.find((person) => person.id === data.currentUserId) ?? data.approvers[0];
   const incomingCount = data.cases.filter((item) => item.state !== "completed" && (item.currentMemberId || item.returnedToStarter)).length;
@@ -147,6 +161,7 @@ export default function App() {
     window.history.pushState({}, "", pathFor(next, addressKey));
     setPage(next);
     setSelectedCaseId(next === "case" ? addressKey : undefined);
+    setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const notify = (message: string) => setToast(message);
@@ -164,8 +179,8 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">承</span><div><strong>社内承認回覧</strong></div></div>
+      <aside id="main-menu" className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
+        <div className="sidebar-header"><div className="brand"><span className="brand-mark">承</span><div><strong>社内承認回覧</strong></div></div><button className="mobile-menu-close" onClick={() => setMobileMenuOpen(false)} aria-label="メニューを閉じる">×</button></div>
         <nav aria-label="メインメニュー">
           <button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><span>⌂</span>ホーム</button>
           <button className={page === "new" ? "active" : ""} onClick={() => navigate("new")}><span>＋</span>新しい回覧</button>
@@ -174,10 +189,11 @@ export default function App() {
         </nav>
         <div className="sidebar-note"><strong>確認用デモ</strong><p>データはこのブラウザ内だけに保存されます。</p></div>
       </aside>
+      {mobileMenuOpen && <button className="sidebar-overlay" onClick={() => setMobileMenuOpen(false)} aria-label="メニューを閉じる" />}
 
       <div className="main-column">
         <header className="topbar">
-          <div><span className="demo-pill">確認用デモ</span></div>
+          <div className="topbar-start"><button className="mobile-menu-button" onClick={() => setMobileMenuOpen(true)} aria-label="メニューを開く" aria-controls="main-menu" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span className="demo-pill">確認用デモ</span></div>
           <div className="topbar-controls">{page === "new" ? <div className="user-switcher"><span className="user-caption">回覧開始者（デモ）</span><Avatar name={currentUser.name} small /><select value={currentUser.id} onChange={(event) => setCurrentUser(event.target.value)} aria-label="回覧開始者"><option value="" disabled>回覧開始者</option>{data.approvers.filter((person) => person.active).map((person) => <option key={person.id} value={person.id}>{person.name}（{person.department}）</option>)}</select></div> : <div className="address-model"><span>↗</span><div><strong>案件URL方式</strong><small>専用URLをメールで共有</small></div></div>}</div>
         </header>
 
@@ -307,8 +323,7 @@ function NewCirculationPage({ data, currentUser, setTemplates, onStart, notify }
 
   return <div className="page">
     <PageHeading title="新しい回覧" description="文書と回付ルートを設定します。" />
-    <div className="builder-grid">
-      <div className="builder-main">
+    <div className="builder-main">
         <section className="panel form-section"><div className="number-title"><b>1</b><div><h2>対象文書</h2><p>複数の文書を選び、文書ごとに捺印要否を設定できます。</p></div></div><div className="document-source"><label><span className="field-label">保存場所</span><select value={provider} onChange={(event) => { setProvider(event.target.value as ProviderType); setSelectedDocuments([]); }}><option value="sharepoint">SharePoint</option><option value="onedrive">OneDrive</option><option value="shared-folder">共有フォルダ</option></select></label><button className="secondary-button" onClick={() => setFilePicker(true)}>＋ 文書を選択</button></div>
           {selectedDocuments.length === 0 ? <div className="document-empty">文書が選択されていません</div> : <div className="selected-documents">{selectedDocuments.map((document) => <div className="selected-document" key={document.id}><span className={`file-icon ${fileClass(document.type)}`}>{fileLabel(document.type)}</span><div className="selected-document-main"><strong>{document.name}</strong><small>{document.location}</small></div><div className="document-action-choice" aria-label={`${document.name}の処理`}><button className={document.requiresStamp ? "active stamp" : ""} onClick={() => setSelectedDocuments(selectedDocuments.map((item) => item.id === document.id ? { ...item, requiresStamp: true } : item))}>捺印対象</button><button className={!document.requiresStamp ? "active" : ""} onClick={() => setSelectedDocuments(selectedDocuments.map((item) => item.id === document.id ? { ...item, requiresStamp: false } : item))}>確認のみ</button></div><button className="document-remove" onClick={() => setSelectedDocuments(selectedDocuments.filter((item) => item.id !== document.id))} aria-label={`${document.name}を削除`}>×</button></div>)}</div>}
         </section>
@@ -319,8 +334,7 @@ function NewCirculationPage({ data, currentUser, setTemplates, onStart, notify }
           </div>
           {route.length > 0 && <div className="route-footer"><span>{route.length}名の回付ルート</span><button className="secondary-button" onClick={() => setSaveModal(true)}>ルートを名前を付けて保存</button></div>}
         </section>
-      </div>
-      <aside className="panel summary-card"><h2>回覧を開始</h2><p className="start-summary">文書 <strong>{selectedDocuments.length}</strong>件　承認者 <strong>{route.length}</strong>名</p><p className="start-user">開始者：{currentUser.name}</p><button className="primary-button full large-button" disabled={selectedDocuments.length === 0 || route.length === 0} onClick={start}>回覧を開始する</button>{(selectedDocuments.length === 0 || route.length === 0) && <small className="helper">文書と承認者を設定してください</small>}</aside>
+      <section className="panel start-section"><div><h2>回覧を開始</h2><p>文書 {selectedDocuments.length}件 ・ 承認者 {route.length}名 ・ 開始者 {currentUser.name}</p>{(selectedDocuments.length === 0 || route.length === 0) && <small>文書と承認者を設定してください</small>}</div><button className="primary-button large-button" disabled={selectedDocuments.length === 0 || route.length === 0} onClick={start}>回覧を開始する</button></section>
     </div>
     {filePicker && <FilePicker provider={provider} selectedIds={selectedDocuments.map((item) => item.fileId)} onClose={() => setFilePicker(false)} onConfirm={(files) => { const existing = new Map(selectedDocuments.map((item) => [item.fileId, item])); setSelectedDocuments(files.map((file) => existing.get(file.id) ?? { id: uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: "#demo-document", requiresStamp: false })); setFilePicker(false); notify(`${files.length}件の文書を選択しました`); }} />}
     {saveModal && <TemplateSaveModal currentUser={currentUser} route={route} onClose={() => setSaveModal(false)} onSave={(template) => { setTemplates([...data.templates, template]); setSelectedTemplateId(template.id); setSaveModal(false); notify(`「${template.name}」を保存しました`); }} />}
@@ -425,7 +439,6 @@ function CaseDetail({ item, approvers, onBack, onChange, notify }: { item: Circu
         </section>
         <section className="panel history-panel"><div className="section-title"><h2>回覧履歴</h2><span className="result-count">{item.history.length}件</span></div><div className="history-list">{[...item.history].reverse().map((entry) => <article key={entry.id}><span className={`history-mark ${entry.action.includes("NG") ? "ng" : ""}`}>{entry.action.includes("NG") ? "!" : "✓"}</span><div><div><strong>{entry.actionUserName}</strong><span>{entry.action}</span><time>{formatDate(entry.createdAt)}</time></div><p>{entry.previousState} → {entry.newState}</p>{entry.returnToUserName && <p className="return-line">戻り先：{entry.returnToUserName}</p>}{entry.comment && <blockquote>{entry.comment}</blockquote>}</div></article>)}</div></section>
       </div>
-      <aside className="detail-aside"><section className="panel metadata-card"><h3>案件情報</h3><dl><div><dt>保存場所</dt><dd>{providerLabels[item.provider]}</dd></div><div><dt>回覧開始者</dt><dd>{item.initiatorName}</dd></div><div><dt>開始日時</dt><dd>{formatDate(item.startedAt)}</dd></div><div><dt>文書数</dt><dd>{item.documents.length}件</dd></div></dl></section><div className="security-note"><span>⌾</span><div><strong>印影データは保存しません</strong><p>印影・署名画像は保持しません。</p></div></div></aside>
     </div>
     {rejecting && current && <RejectModal item={item} current={current} user={{ id: current.approverId, name: current.name }} onClose={() => setRejecting(false)} onSubmit={(changed) => { onChange(changed); setRejecting(false); notify("案件を差し戻しました"); const destination = changed.returnedToStarter ? approvers.find((person) => person.id === changed.initiatorId) : changed.members.find((member) => member.id === changed.currentMemberId); const latest = changed.history.at(-1); if (destination) openMailDraft(destination.email, `【差し戻し】${caseTitle(changed)}`, `${destination.name}さん\n\n${current.name}さんから案件が差し戻されました。\n\n案件名：${caseTitle(changed)}\n文書数：${changed.documents.length}件\n案件ID：${changed.id}\n戻り先：${destination.name}\n差し戻し理由：${latest?.comment ?? ""}\n\n案件URL：\n${window.location.href}\n\n内容を確認し、案件ページから対応してください。`); }} />}
     {editingRoute && <RouteEditModal item={item} approvers={approvers} onClose={() => setEditingRoute(false)} onSave={(changed) => { onChange(changed); setEditingRoute(false); notify("未処理の回付ルートを更新しました"); }} notify={notify} />}
