@@ -4,6 +4,8 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 
 デモ版：<https://waragamef-png.github.io/approval-circulation-app/>
 
+> この公開版は画面・操作確認専用です。登録済みの氏名、メールアドレス、部門、案件、ファイルはすべてダミーデータであり、社内本番運用には使用しません。
+
 現在はSTEP 1の完全ローカルUIモックとSTEP 2のGit管理用ファイル整備まで完了しています。Microsoft 365、実ファイル、実メールにはまだ接続していません。
 
 ## システム概要
