@@ -465,6 +465,9 @@ b33d91c Docs公開デモの注意事項を追加
 - Graph未設定時の`GET /api/sharepoint/files`はHTTP 503。
 - 実ブラウザで確認用SharePoint文書の複数選択、選択確定、選択後表示、コンソールエラーなしを確認。
 - ソース、`.env.example`へ秘密情報、秘密鍵、証明書が追加されていないことを確認。
+- `19a807d`のGitHub Actions `33316579010`でPagesビルド・配信成功を確認。
+- 公開版でSharePoint確認用データ、PDF・Excel一覧、エラーログなしを確認。
+- STEP 5完了状態を記録した`b17dc39`のGitHub Actions `33316691586`も成功。
 
 ### 実テナントで後ほど確認する内容
 
