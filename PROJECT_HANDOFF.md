@@ -267,7 +267,7 @@ Dataverse、有料DB、有料SaaS、Premium Power Automateを勝手に前提に�
 - [x] STEP 2：Git管理用ファイル整備・GitHub Pages公開
 - [x] STEP 3：利用者ログイン不要の案件URL方式へ変更
 - [x] STEP 4：Microsoft Graphユーザー検索（コード・ローカル検証完了、実テナント疎通待ち）
-- [ ] STEP 5：SharePointファイル参照
+- [x] STEP 5：SharePointファイル参照（実テナント疎通は接続情報設定後）
 - [ ] STEP 6：OneDriveファイル参照
 - [ ] STEP 7：実ファイルを開く
 - [ ] STEP 8：SharePoint Listsへ回覧情報保存
@@ -323,7 +323,7 @@ b33d91c Docs公開デモの注意事項を追加
 
 ## 12. 現在のGit状態（非常に重要）
 
-2026-08-30にSTEP 4の実装・ローカル検証を完了し、`main`へコミット・push済み。GitHub Pagesの更新も確認済み。この文書の完了状態更新を含め、次回再開時の`git status --short`は空であることが正常。
+2026-08-30にSTEP 5の実装・ローカル検証を完了し、機能コミット`19a807d`を`main`へpush済み。この文書の完了状態更新を含め、次回再開時の`git status --short`は空であることが正常。
 
 今後も未確認の変更がある場合は、リセット、checkout、削除で破棄しない。
 
@@ -427,12 +427,60 @@ b33d91c Docs公開デモの注意事項を追加
 
 - 会社環境ではないため、実テナントのTenant ID、Client ID、証明書、管理者同意を使ったGraph疎通だけは保留。会社PCと管理情報を利用できる段階で実施し、STEP 4のローカル完成・公開デモ完成を妨げるものではない。
 
-## 15. 次に再開時に行うこと
+## 15. STEP 5で実装・確認した内容
 
-1. `git status --short`が空で、`git log --oneline -5`にSTEP 4完成コミットと初期案件補完コミットがあることを確認する。
-2. STEP 4はローカル実装・検証・コミット・push・GitHub Pages反映まで完了済みとして扱う。
-3. ユーザー確認後、別の区切りでSTEP 5「SharePointファイル参照」へ進む。最初に対象SharePointサイトを決め、実ファイルを変更せず一覧取得だけを実装する。
-4. 実テナントの社内名簿検索は、会社PCとMicrosoft 365管理情報を利用できる段階で確認する。秘密情報をチャットやソースへ貼らず、会社PCの`.env`とリポジトリ外の秘密鍵ファイルだけを使う。
+機能コミット：`19a807d STEP 5のSharePoint文書参照を実装`
+
+### バックエンド
+
+- `server/graphSharePoint.mjs`を追加。
+- Graphから対象SharePointサイト、ドキュメントライブラリ、DriveItemを読み取り専用で取得。
+- `GET /api/sharepoint/files`を追加。
+- PDF、Excel、Word、PowerPointだけを一覧対象とし、PDF、Excelを先に表示。
+- DriveItem ID、ファイル名、更新日時、更新者、保存場所、`webUrl`を返す。
+- 対象文書ライブラリまたはフォルダ直下に参照範囲を限定可能。
+- 既定最大500件、既定1分キャッシュ。
+- Graphアクセストークン取得処理を社内名簿検索と共用し、ブラウザへトークンを渡さない。
+- Graph未設定、SharePoint参照先未設定、Graph取得失敗を日本語メッセージで区別。
+- `GET /api/health`へ`sharePointConfigured`を追加。
+
+### フロントエンド
+
+- `src/services/sharepoint.ts`を追加。
+- 「新しい回覧」のSharePoint文書選択時にバックエンドから文書一覧を取得。
+- 読み込み中、空一覧、取得失敗、再読み込みを簡潔な日本語で表示。
+- 接続時は対象サイト、文書ライブラリ、任意フォルダを文書選択画面へ表示。
+- 選択した文書へ実DriveItem IDと`webUrl`を保持。
+- GitHub Pages版とAPI未設定時は従来の確認用データを表示し、実データと混同しない表示を維持。
+- 既存の複数文書選択、文書ごとの捺印要否、簡潔な一覧デザインを維持。
+
+### 確認済み
+
+- `pnpm typecheck`成功。
+- `pnpm test`成功、全4テスト通過。
+- SharePointテスト内容：対象サイト解決、文書ライブラリ選択、指定フォルダ、ページング、対応形式だけの抽出、PDF・Excel優先、更新者フォールバック、キャッシュ、GraphエラーのリクエストID。
+- 会社PC向け`pnpm build`成功。
+- GitHub Pages向けbase pathビルド成功。
+- Graph未設定時の`GET /api/health`は`graphConfigured:false`、`sharePointConfigured:false`。
+- Graph未設定時の`GET /api/sharepoint/files`はHTTP 503。
+- 実ブラウザで確認用SharePoint文書の複数選択、選択確定、選択後表示、コンソールエラーなしを確認。
+- ソース、`.env.example`へ秘密情報、秘密鍵、証明書が追加されていないことを確認。
+
+### 実テナントで後ほど確認する内容
+
+- 会社環境でTenant ID、Client ID、証明書、Application `Sites.Selected`の管理者同意を設定。
+- 対象SharePointサイトへアプリの読み取り権限だけを付与。
+- 対象サイト、文書ライブラリ、必要なら対象フォルダを決定して`.env`へ設定。
+- 実ファイル一覧、ページング、更新者表示、サイト権限外の参照不可を確認。
+
+実テナント疎通は会社環境が必要なため保留だが、STEP 5のコード、ローカル検証、公開デモ完成を妨げるものではない。
+
+## 16. 次に再開時に行うこと
+
+1. `git status --short`が空で、`git log --oneline -5`に`19a807d`とSTEP 5完了状態の文書コミットがあることを確認する。
+2. STEP 5はローカル実装・検証・コミット・push・GitHub Pages反映まで完了済みとして扱う。
+3. ユーザー確認後、別の区切りでSTEP 6「OneDriveファイル参照」へ進む。SharePointと同じ文書選択画面へ統合する。
+4. 実テナントの社内名簿検索とSharePoint文書一覧は、会社PCとMicrosoft 365管理情報を利用できる段階で確認する。秘密情報をチャットやソースへ貼らず、会社PCの`.env`とリポジトリ外の秘密鍵ファイルだけを使う。
 
 ```powershell
 cd <新PCのコピー先>\app\approval-circulation-app
@@ -445,7 +493,7 @@ pnpm build
 pnpm dev
 ```
 
-## 16. 実Graph接続時に必要なもの
+## 17. 実Graph接続時に必要なもの
 
 - Directory（Tenant）ID
 - Application（Client）ID
@@ -454,6 +502,9 @@ pnpm dev
 - 証明書の公開鍵をアプリ登録へアップロード
 - 会社PC側の秘密鍵ファイルのパス
 - 証明書のSHA-256拇印
+- Application `Sites.Selected`
+- 対象SharePointサイトへの読み取り権限
+- SharePointホスト名、サイトパス、対象文書ライブラリ名、必要な場合は対象フォルダ
 
 秘密鍵ファイルやクライアントシークレットをチャットへ貼らせない。`.env`もGitへコミットしない。
 
@@ -472,11 +523,17 @@ GRAPH_CLIENT_CERTIFICATE_THUMBPRINT=
 GRAPH_CLIENT_SECRET=
 GRAPH_DIRECTORY_CACHE_TTL_MS=300000
 GRAPH_DIRECTORY_MAX_USERS=5000
+SHAREPOINT_HOSTNAME=
+SHAREPOINT_SITE_PATH=
+SHAREPOINT_LIBRARY_NAME=
+SHAREPOINT_FOLDER_PATH=
+SHAREPOINT_CACHE_TTL_MS=60000
+SHAREPOINT_MAX_FILES=500
 ```
 
 会社LANの別PCから使う段階では、`APP_HOST=0.0.0.0`、Windowsファイアウォール、固定IPまたは社内DNS、許可接続元を社内管理者と設定する。
 
-## 17. データモデル上の重要事項
+## 18. データモデル上の重要事項
 
 - 主要型は`src/types.ts`。
 - `Approver`、`RouteMember`、`RouteTemplate`、`HistoryEntry`、`CaseDocument`、`CirculationCase`、`AppData`、`MockFile`。
@@ -486,27 +543,31 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - 案件開始時に氏名、メール、部門、捺印要否を案件メンバーへスナップショット保存する。
 - 承認者マスタが変更されても過去案件の履歴表示を変えない。
 - 1案件に`documents: CaseDocument[]`を持つ。
+- `CaseDocument.fileId`へSharePoint DriveItem ID、`fileUrl`へGraphが返す`webUrl`を保存する。
 - 案件に`accessKey`を持つ。
 - STEP 1のLocalStorageキーは`circlia-step1-v1`。内部旧名だが、データ移行なしで不用意に変更しない。
 
-## 18. 現時点の制約
+## 19. 現時点の制約
 
 - 案件、テンプレート、履歴はまだブラウザのLocalStorage。
 - 選択した開始者も現在のブラウザだけに保持される。別PC、別ブラウザ、プライベートブラウズ、ブラウザデータ消去後は再選択が必要。
 - 複数PC間で案件データを共有できない。
 - GitHub Pages版はバックエンドを持たず、Graph検索や実メール送信をしない。
-- ファイル一覧と「文書を開く」はダミー。
-- SharePoint／OneDrive、SharePoint Lists未接続。
+- GitHub Pages版とMicrosoft 365未設定時のファイル一覧は確認用データ。
+- SharePoint実接続時も「文書を開く」はSTEP 7まで確認表示。
+- SharePoint一覧は設定した文書ライブラリ直下、または指定フォルダ直下だけを取得する。
+- OneDrive、SharePoint Lists未接続。
 - メール送信はUIデモ。
 - PDF捺印有無の自動判定なし。
 - 同時更新、排他制御、ネットワーク障害対策、監査ログ本番化は未実装。
 - 本人認証なしのため、案件URLを持つ人が操作できる。
 - Graphキャッシュは既定5分、上限5,000名。大規模テナントでは再設計が必要。
+- SharePoint文書一覧は既定1分キャッシュ、上限500件。
 
-## 19. やってはいけないこと
+## 20. やってはいけないこと
 
 - いきなり全STEPを実装しない。
-- STEP 4未完了のままSTEP 5へ進まない。
+- STEP 5未完了のままSTEP 6へ進まない。
 - 本人認証やMicrosoft 365利用者ログインを勝手に復活させない。
 - URL方式を個人アカウント方式へ変更しない。
 - `mailto:`方式へ戻さない。
@@ -520,7 +581,7 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - 未コミット変更を破棄しない。
 - ユーザーの明示なしに別GitHubリポジトリへpushしない。
 
-## 20. STEP完了報告の形式
+## 21. STEP完了報告の形式
 
 各STEP完了時は次を報告する。
 
@@ -540,7 +601,7 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 
 - 次の1STEPだけを説明し、ユーザーが確認できる状態で一度停止。
 
-## 21. 参照すべきファイル
+## 22. 参照すべきファイル
 
 - `README.md`：一般向け説明と起動手順
 - `HANDOFF_PROMPT.md`：新しいスレッドへ貼る開始プロンプト
@@ -552,16 +613,19 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - `src/styles.css`：UI
 - `src/providers/StorageProvider.ts`：ストレージ抽象化
 - `src/services/directory.ts`：Graph社内名簿APIクライアント
+- `src/services/sharepoint.ts`：SharePoint文書一覧APIクライアント
+- `server/graphSharePoint.mjs`：SharePoint対象サイト・文書ライブラリ・DriveItem取得
+- `server/graphSharePoint.test.mjs`：SharePoint文書一覧の自動テスト
 - `server/index.mjs`：会社PC用API／Web配信
 - `server/graphAuth.mjs`：MSALアプリ認証
 - `server/graphDirectory.mjs`：Graphユーザー取得・検索
 - `.env.example`：秘密情報を含まない設定例
 - `package.json`：起動・検証コマンド
 
-## 22. 代表的な回帰確認操作
+## 23. 代表的な回帰確認操作
 
 1. 承認者を氏名・メール・部門で検索し追加。
-2. 複数文書を選択し、文書ごとの捺印要否を設定。
+2. SharePointまたは確認用データから複数文書を選択し、文書ごとの捺印要否を設定。
 3. 回付ルートを作成、並べ替え、捺印要否変更。
 4. ルート保存、読み込み、上書き、複製。
 5. 回覧開始し、案件URLと現在確認者を確認。
@@ -573,4 +637,4 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 11. 最後まで回覧完了。
 12. スマホ幅でもホーム上部の2ボタン、案件一覧、回付ルートの番号・処理ラベル・文字ボタンの配置を確認。
 
-この一連を維持した状態で、STEP 4の社内名簿候補が追加されるのが正しい完成形です。
+この一連とSTEP 4の社内名簿候補を維持した状態で、STEP 5のSharePoint文書一覧が追加されるのが正しい完成形です。
