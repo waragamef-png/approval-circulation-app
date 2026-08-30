@@ -10,7 +10,7 @@
     "build": "vite build",
     "start": "node server/index.mjs",
     "preview": "vite preview",
-    "test": "node --test server/graphDirectory.test.mjs server/graphSharePoint.test.mjs",
+    "test": "node --test server/graphDirectory.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

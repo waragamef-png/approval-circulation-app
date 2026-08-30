@@ -4,9 +4,9 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 
 デモ版：<https://waragamef-png.github.io/approval-circulation-app/>
 
-> この公開版は画面・操作確認専用です。登録済みの氏名、メールアドレス、部門、案件、ファイルはすべてダミーデータであり、社内本番運用には使用しません。
+> この公開版は画面・操作確認専用です。初期表示される氏名、メールアドレス、部門、案件、ファイルはすべてダミーデータです。実際の会社情報やSharePointリンクは登録しないでください。
 
-現在はSTEP 4まで実装済みです。Microsoft Graphユーザー検索用のバックエンドと画面連携を追加しました。接続情報がない環境では、従来どおりローカルのダミーデータだけで動作します。実ファイルと実メールにはまだ接続していません。
+現在はSTEP 5まで実装済みです。SharePoint文書はコピーしたリンクを登録し、会社側で設定済みのアクセス権を使って開きます。SharePoint用のTenant ID、Client ID、管理者同意は不要です。Microsoft Graphの社内名簿検索は任意機能で、未設定時はローカルの承認者マスタだけで動作します。
 
 ## システム概要
 
@@ -20,7 +20,7 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 6. 次の宛先用メールをWebアプリ内で確認・編集して送信
 7. 最後の承認者が完了すると開始者へ完了通知
 
-承認操作に対する本人確認やMicrosoft 365ログインは行わず、案件URLを持つ利用者が処理できる方式を採用します。後続STEPでMicrosoft 365を利用する場合も、ファイル参照やメール送信はバックエンド側だけで接続します。
+承認操作に対する本人確認やMicrosoft 365ログインは行わず、案件URLを持つ利用者が処理できる方式を採用します。SharePoint文書を開いた際の閲覧可否は、SharePoint側の既存アクセス権で判定されます。
 
 ## アーキテクチャ
 
@@ -28,10 +28,9 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 flowchart LR
   Browser["React Webアプリ"] --> API["Node.jsバックエンドAPI"]
   Browser -. "STEP 1" .-> LocalStorage["LocalStorage"]
-  API --> Graph["Microsoft Graph API"]
-  Graph --> SharePoint["SharePoint / SharePoint Lists"]
-  Graph --> OneDrive["OneDrive"]
-  Graph --> Exchange["Exchange Online メール"]
+  Browser --> Link["登録したSharePointリンク"]
+  Link --> SharePoint["SharePointの既存アクセス権"]
+  API -. "任意" .-> Graph["Microsoft Graph 社内名簿"]
   API --> Gateway["社内共有フォルダゲートウェイ"]
   Gateway --> SMB["Windows / SMB共有"]
 ```
@@ -40,16 +39,16 @@ flowchart LR
 
 - ブラウザだけで動作するReact SPA
 - 承認者、テンプレート、案件、履歴をLocalStorageへ保存
-- ダミーファイルとダミーユーザーを使用
+- SharePointはコピーした文書リンクを登録し、実ファイルを別画面で開く
+- OneDriveと共有フォルダは確認用ファイルを使用
 - メール作成・編集・送信画面はUIデモ
 - 設定時のみ、バックエンドからMicrosoft Graphの社内ユーザーを検索
 
 ### 本接続後の構成
 
-- Microsoft 365接続はバックエンドまたは安全なGraphアクセス層へ集約
-- 回覧データはSharePoint Listsへ保存
-- ファイル本体はSharePoint / OneDrive上の元データを利用
-- 通知メールは専用メールボックスからMicrosoft Graphで送信
+- 回覧データは会社PCのバックエンドへ保存する方向でSTEP 8に再設計
+- SharePoint / OneDrive上の元データはリンクで参照し、会社側の既存アクセス権を利用
+- 管理者設定を必要としない通知方法をSTEP 13で再検討
 - SMB共有は社内APIまたはWindowsサービスを介して接続
 
 ## 使用技術
@@ -62,7 +61,6 @@ flowchart LR
 - pnpm
 - LocalStorage（STEP 1のみ）
 - Microsoft Graph API / バックエンドアプリ認証
-- SharePoint Lists（STEP 8以降）
 
 ## フォルダ構成
 
@@ -76,15 +74,13 @@ approval-circulation-app/
 │  ├─ styles.css                 共通スタイル
 │  ├─ types.ts                   ドメインモデル
 │  ├─ services/
-│  │  ├─ directory.ts            社内ユーザー検索APIクライアント
-│  │  └─ sharepoint.ts           SharePoint文書一覧APIクライアント
+│  │  └─ directory.ts            社内ユーザー検索APIクライアント
 │  └─ providers/
 │     └─ StorageProvider.ts      ストレージ共通インターフェース
 ├─ server/
 │  ├─ index.mjs                  Express API・ビルド済み画面の配信
 │  ├─ graphAuth.mjs              MSALによるアプリ認証
-│  ├─ graphDirectory.mjs         Graphユーザー取得・検索・キャッシュ
-│  └─ graphSharePoint.mjs        SharePoint文書一覧取得・キャッシュ
+│  └─ graphDirectory.mjs         Graphユーザー取得・検索・キャッシュ
 ├─ .env.example                  環境変数の記入例
 ├─ .gitignore
 ├─ index.html
@@ -180,13 +176,9 @@ STEP 1では、回覧開始・承認・差し戻し・再回覧の内容を案�
 
 ## Microsoft Graph設定方法
 
-以下のAPIを使用します。
+任意の社内名簿検索を有効にする場合だけ、以下のAPIを使用します。
 
 - ユーザー検索：`/users`
-- SharePointサイト・ドライブ参照：`/sites`、`/drives`
-- OneDrive参照：対象ドライブの`/drives`
-- Office文書・PDFのWeb URL取得：DriveItemの`webUrl`
-- 通知メール送信：`/users/{sender}/sendMail`
 
 ユーザー検索は`GET /users`から`id`、`displayName`、`mail`、`userPrincipalName`、`department`、`accountEnabled`だけを取得します。最大5,000名、5分間のバックエンドキャッシュを既定値とし、氏名・メール・部門を途中一致で検索します。Graph接続処理とアクセストークンはブラウザへ出しません。
 
@@ -197,40 +189,26 @@ STEP 1では、回覧開始・承認・差し戻し・再回覧の内容を案�
 | 用途 | 候補権限 | 導入STEP |
 |---|---|---:|
 | ユーザー検索 | Application `User.Read.All`（必要な場合のみ） | 4 |
-| SharePoint対象サイト | Application `Sites.Selected`を優先 | 5、8 |
-| OneDriveファイル参照 | 対象構成に応じたApplication権限を実装時に確定 | 6 |
-| 専用メールボックスからサーバー送信 | Application `Mail.Send`をメールボックス単位に制限 | 13 |
 
-テナント管理者の同意要否と社内セキュリティ方針を確認してから確定します。
+管理者へ依頼しない運用ではGraph社内名簿検索を設定せず、アプリ内の承認者マスタを使用します。SharePoint文書リンクの登録・閲覧にはGraph権限を使いません。
 
 ## SharePoint設定方法
 
-STEP 5では、会社PCのバックエンドから対象サイトのドキュメントライブラリとDriveItemを読み取り専用で取得します。ブラウザへGraphアクセストークンを渡しません。
+STEP 5では、SharePointでコピーした文書リンクとファイル名を回覧へ登録します。
 
 推奨手順：
 
-1. 専用サイトまたは既存対象サイトを決定
-2. アプリへ対象サイトだけの権限を付与
-3. `.env`へ`SHAREPOINT_HOSTNAME`と`SHAREPOINT_SITE_PATH`を設定
-4. 必要なら`SHAREPOINT_LIBRARY_NAME`と`SHAREPOINT_FOLDER_PATH`で参照範囲を限定
-5. PDF、Excelを優先して一覧表示
-6. DriveItem ID、ファイル名、更新日時、更新者、保存場所、`webUrl`を保持
-7. Office文書はSTEP 7でOffice for the webから元ファイルを開く
+1. SharePointで対象文書の「リンクをコピー」
+2. 新しい回覧で「SharePointリンクを追加」を開く
+3. コピーしたリンクを貼り付ける
+4. 自動入力されたファイル名を確認し、必要な場合だけ修正
+5. 案件画面の「文書を開く」から別画面でSharePointを開く
 
-設定値の例：
-
-```dotenv
-SHAREPOINT_HOSTNAME=example.sharepoint.com
-SHAREPOINT_SITE_PATH=/sites/approval-circulation
-SHAREPOINT_LIBRARY_NAME=共有ドキュメント
-SHAREPOINT_FOLDER_PATH=回覧対象
-```
-
-`SHAREPOINT_LIBRARY_NAME`を空にすると最初のドキュメントライブラリ、`SHAREPOINT_FOLDER_PATH`を空にするとライブラリ直下を参照します。サイト全体への広い権限ではなくApplication `Sites.Selected`を優先し、対象サイトへ読み取り権限だけを付与します。
+閲覧できる人は会社側で既に設定されたSharePointアクセス権に従います。アプリは権限を追加・変更せず、Tenant ID、Client ID、`Sites.Selected`、管理者同意も使用しません。
 
 ## OneDrive設定方法
 
-STEP 6でSharePointと同じファイル選択UIへ統合します。Graph固有の差異は`OneDriveProvider`内へ閉じ込めます。
+STEP 6ではOneDriveも同じリンク登録方式へ統合し、管理者設定を不要にします。
 
 Webアプリの回覧ロジックは以下の共通契約だけを使用します。
 
@@ -256,7 +234,9 @@ interface StorageProvider {
 
 第一候補は、許可した共有フォルダだけを操作できる小さな社内APIです。パストラバーサル対策、許可ルート、監査ログ、サービスアカウント権限を設け、`SharedFolderProvider`から呼び出します。
 
-## 必要SharePoint Lists
+## 会社PCへ保存する回覧データ
+
+STEP 8ではSharePoint Listsを前提にせず、会社PCのバックエンドで共有保存できる方式を再設計します。保持するデータ項目は次のとおりです。
 
 ### Approvers
 
@@ -295,10 +275,10 @@ interface StorageProvider {
 - 300ms debounce付き承認者オートコンプリート
 - 氏名・メール・部門検索と、承認者マスタへの重複登録警告
 - Microsoft Graphの社内ユーザー検索API
-- Microsoft GraphによるSharePoint対象サイトと文書ライブラリの参照API
-- SharePointのPDF・Excel・Word・PowerPoint一覧取得（PDF・Excelを優先表示）
-- SharePoint文書のDriveItem ID、更新日時、更新者、保存場所、`webUrl`保持
-- SharePoint未設定時の確認用データ表示と、接続失敗時の日本語エラー・再読み込み
+- SharePointでコピーした文書リンクとファイル名の登録
+- SharePointリンクからのファイル名自動入力と、分からない場合の手入力
+- 同じSharePointリンクの重複登録防止
+- 案件画面からSharePoint文書を別画面で開く
 - 社内名簿ユーザーを回付ルートへ直接追加
 - 社内名簿ユーザーを承認者マスタへ登録
 - Entra IDに部門がないユーザーの表示・登録
@@ -308,7 +288,7 @@ interface StorageProvider {
 - 回覧開始者を先頭に含む回付ルートと、開始者以外の行のドラッグ並べ替え
 - 保存済みの開始者名を固定表示し、「変更」を押したときだけ氏名・メール・部門から検索して再選択
 - ルートテンプレートの保存・読込・上書き・複製・削除
-- SharePointまたは確認用データからの複数文書選択と、文書ごとの「捺印対象 / 確認のみ」設定
+- 複数のSharePoint文書リンク登録と、文書ごとの「捺印対象 / 確認のみ」設定
 - 文書・回付ルートの設定後に回覧を開始する縦型の操作導線
 - 案件開始とランダムな案件専用URL発行
 - 案件一覧、案件詳細、現在の確認者、進捗、履歴
@@ -325,8 +305,8 @@ interface StorageProvider {
 ## 未実装機能
 
 - OneDrive実ファイル参照
-- Office for the web / PDF実ファイル起動
-- SharePoint Listsへのデータ保存
+- OneDrive／共有フォルダの実ファイル起動
+- 会社PCバックエンドへの回覧データ保存
 - 複数PC間での案件共有
 - Microsoft Graphによる実メール送信
 - 共有フォルダゲートウェイ
@@ -341,8 +321,9 @@ interface StorageProvider {
 - 証明書や秘密鍵をGitへコミットしない
 - 印影・署名画像をアプリへ保存しない
 - Graph権限はSTEPごとに最小権限で追加
-- STEP 4のGraph権限はApplication `User.Read.All`のみ
-- STEP 5のSharePoint権限はApplication `Sites.Selected`を優先し、対象サイトを読み取り専用に限定
+- STEP 4のGraph社内名簿検索は任意で、管理者へ依頼しない運用では使用しない
+- SharePoint文書は`https`かつ`sharepoint.com`のリンクだけを登録可能
+- SharePointアクセス権は会社側の既存設定に任せ、アプリから追加・変更しない
 - Graphアクセストークンはバックエンド内だけで使用
 - 社内名簿APIは許可した接続元だけにCORS応答
 - メール送信権限は専用メールボックスへ限定
@@ -354,15 +335,15 @@ interface StorageProvider {
 - 選択した開始者も同じブラウザでは保持されますが、別PC・別ブラウザ・プライベートブラウズ・ブラウザデータ消去後は再選択が必要です
 - `localhost`の案件URLは別PCから開けません
 - 「メール送信」はUIデモで、実際のメールは送られません
-- GitHub Pages版とMicrosoft 365未設定時のファイル一覧は確認用データです
-- SharePoint実接続時も「文書を開く」はSTEP 7まで確認表示です
-- SharePoint一覧は設定した文書ライブラリ直下、または指定フォルダ直下だけを取得します
+- SharePoint文書は一覧から自動取得せず、利用者がコピーしたリンクを登録します
+- SharePointリンクを開いた後の閲覧可否は、会社側の既存アクセス権に従います
+- SharePointへ未ログインの場合、SharePoint側で会社アカウントのログインを求められる場合があります
 - PDFへの捺印有無を自動判定しません
 - 同時更新、排他制御、ネットワーク障害対策は未実装です
 - 本人認証を行わないため、社内名簿APIを公開インターネットへ直接公開しないでください
 - 5,000名を超えるテナントは`GRAPH_DIRECTORY_MAX_USERS`と検索方式の再検討が必要です
 - Graphユーザー情報は既定で最大5分遅れて反映されます
-- 実テナント接続はTenant ID、Client ID、証明書、管理者同意、対象SharePointサイトの読み取り権限準備後に確認します
+- 管理者設定をしない運用ではMicrosoft Graph社内名簿検索を使用しません
 - スマートフォンよりPCブラウザを優先しています
 
 ## 開発STEP
@@ -371,16 +352,16 @@ interface StorageProvider {
 - [x] STEP 1：完全ローカルUIモック
 - [x] STEP 2：Git管理用ファイル整備
 - [x] STEP 3：利用者ログイン不要の方式へ変更（バックエンド接続は後続STEP）
-- [x] STEP 4：Microsoft Graphユーザー検索（実テナント疎通は接続情報設定後）
-- [x] STEP 5：SharePointファイル参照（実テナント疎通は接続情報設定後）
-- [ ] STEP 6：OneDriveファイル参照
-- [ ] STEP 7：実ファイルを開く
-- [ ] STEP 8：SharePoint Listsへ保存
+- [x] STEP 4：Microsoft Graphユーザー検索（任意機能、通常運用はローカル承認者マスタ）
+- [x] STEP 5：SharePointリンク登録と実ファイル起動
+- [ ] STEP 6：OneDriveリンク登録
+- [ ] STEP 7：OneDrive／共有フォルダの実ファイル起動
+- [ ] STEP 8：会社PCバックエンドへ回覧情報を保存
 - [ ] STEP 9：実回覧
 - [ ] STEP 10：NG・差し戻し
 - [ ] STEP 11：途中ルート編集
 - [ ] STEP 12：共有フォルダ対応
-- [ ] STEP 13：実メール通知
+- [ ] STEP 13：実メール通知（管理者設定不要の方式を再検討）
 
 ## リポジトリと公開版
 
