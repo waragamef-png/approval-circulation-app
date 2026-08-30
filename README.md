@@ -6,7 +6,7 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 
 > この公開版は画面・操作確認専用です。登録済みの氏名、メールアドレス、部門、案件、ファイルはすべてダミーデータであり、社内本番運用には使用しません。
 
-現在はSTEP 1の完全ローカルUIモックとSTEP 2のGit管理用ファイル整備まで完了しています。Microsoft 365、実ファイル、実メールにはまだ接続していません。
+現在はSTEP 4まで実装済みです。Microsoft Graphユーザー検索用のバックエンドと画面連携を追加しました。接続情報がない環境では、従来どおりローカルのダミーデータだけで動作します。実ファイルと実メールにはまだ接続していません。
 
 ## システム概要
 
@@ -26,7 +26,7 @@ SharePoint、OneDrive、将来の社内共有フォルダに保存された業�
 
 ```mermaid
 flowchart LR
-  Browser["React Webアプリ"] --> API["バックエンドAPI（後続STEP）"]
+  Browser["React Webアプリ"] --> API["Node.jsバックエンドAPI"]
   Browser -. "STEP 1" .-> LocalStorage["LocalStorage"]
   API --> Graph["Microsoft Graph API"]
   Graph --> SharePoint["SharePoint / SharePoint Lists"]
@@ -42,6 +42,7 @@ flowchart LR
 - 承認者、テンプレート、案件、履歴をLocalStorageへ保存
 - ダミーファイルとダミーユーザーを使用
 - メール作成・編集・送信画面はUIデモ
+- 設定時のみ、バックエンドからMicrosoft Graphの社内ユーザーを検索
 
 ### 本接続後の構成
 
@@ -56,9 +57,11 @@ flowchart LR
 - React 19
 - TypeScript 5
 - Vite 8
+- Node.js / Express
+- MSAL Node
 - pnpm
 - LocalStorage（STEP 1のみ）
-- Microsoft Graph API / バックエンドアプリ認証（後続STEP）
+- Microsoft Graph API / バックエンドアプリ認証
 - SharePoint Lists（STEP 8以降）
 
 ## フォルダ構成
@@ -72,8 +75,14 @@ approval-circulation-app/
 │  ├─ storage.ts                 LocalStorageデータ層
 │  ├─ styles.css                 共通スタイル
 │  ├─ types.ts                   ドメインモデル
+│  ├─ services/
+│  │  └─ directory.ts            社内ユーザー検索APIクライアント
 │  └─ providers/
 │     └─ StorageProvider.ts      ストレージ共通インターフェース
+├─ server/
+│  ├─ index.mjs                  Express API・ビルド済み画面の配信
+│  ├─ graphAuth.mjs              MSALによるアプリ認証
+│  └─ graphDirectory.mjs         Graphユーザー取得・検索・キャッシュ
 ├─ .env.example                  環境変数の記入例
 ├─ .gitignore
 ├─ index.html
@@ -84,6 +93,12 @@ approval-circulation-app/
 ```
 
 ## 起動方法
+
+### Windowsで画面から起動
+
+プロジェクトフォルダの `アプリを起動.cmd` をダブルクリックします。確認用サーバーが裏で起動し、`http://localhost:5173/` が自動で開きます。終了するときは `アプリを停止.cmd` をダブルクリックします。
+
+この起動方法は、事前にビルド済みの画面を同じPCで確認するためのものです。ターミナル操作は不要です。
 
 ### 必要環境
 
@@ -99,14 +114,30 @@ pnpm dev
 
 ブラウザで `http://localhost:5173/` を開きます。
 
+`pnpm dev`は画面（5173番）とAPI（3000番）を同時に起動します。Microsoft 365未設定でも画面確認は可能です。
+
+### 会社PCでの起動
+
+```bash
+copy .env.example .env
+pnpm install
+pnpm build
+pnpm start
+```
+
+同じPCでは `http://localhost:3000/` を開きます。社内LANの別PCから開く場合は、`.env`の`APP_HOST=0.0.0.0`、`APP_ALLOWED_ORIGINS`、Windowsファイアウォール、固定IPまたは社内DNSを管理者と設定してください。
+
+`.env.example`の`VITE_API_BASE_URL=same-origin`は、アクセスに使った会社PCのアドレスへAPI通信する設定です。別PCから利用しても`localhost`へ誤接続しません。
+
 ### 確認用コマンド
 
 ```bash
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-ホーム画面の「デモデータを初期化」を押すと、LocalStorageを初期状態へ戻せます。
+ホーム画面の「使い方」ポップアップ内にある「デモデータを初期化」を押すと、LocalStorageを初期状態へ戻せます。
 
 ## 案件URL
 
@@ -120,12 +151,14 @@ https://<社内Webアプリのホスト>/c/<ランダムアクセスキー>
 
 ## メール送信方針
 
-STEP 1では、承認・差し戻し後にWebアプリ内のメール作成画面を開きます。
+STEP 1では、回覧開始・承認・差し戻し・再回覧の内容を案件へ反映する前に、Webアプリ内のメール作成画面を開きます。
 
 - 宛先、件名、本文を自動作成
+- 過去の承認者をCCへ自動入力し、同じメールアドレスと宛先アドレスの重複を除外
 - 案件URL、現在の確認者、任意の差し戻しコメントを自動挿入
 - 送信前にブラウザ上で編集可能
 - 送信ボタンは現在デモ動作
+- 「送信を確認」を押したときだけ案件と回付ルートを更新し、キャンセル時は何も変更しない
 
 本接続後は、通知専用メールボックスからMicrosoft Graph `sendMail`を呼び出します。ブラウザへクライアントシークレットを置かず、バックエンドで証明書認証を使用する構成を第一候補とします。アプリケーション権限を使う場合は、Exchange Online Application RBACで送信元メールボックスを限定します。
 
@@ -133,11 +166,19 @@ STEP 1では、承認・差し戻し後にWebアプリ内のメール作成画�
 
 利用者のログイン設定は不要です。承認者は案件URLを開いて処理します。
 
-SharePoint、OneDrive、実メールへ接続するSTEPで、バックエンド用のアプリ登録を1つ作成します。Tenant ID、Client ID、証明書はバックエンドの環境変数で管理し、ブラウザへ渡しません。必要な値は実接続を始める時点で確認します。
+バックエンド用のシングルテナントアプリ登録を1つ作成します。STEP 4ではアプリケーション権限`User.Read.All`に管理者同意が必要です。Tenant ID、Client ID、証明書はバックエンドの環境変数で管理し、ブラウザへ渡しません。
+
+1. Microsoft Entra管理センターでアプリを登録
+2. Microsoft Graphのアプリケーション権限`User.Read.All`を追加
+3. テナント管理者が同意
+4. 証明書の公開鍵をアプリ登録へアップロード
+5. 秘密鍵をリポジトリ外へ置き、`.env`へパスとSHA-256拇印を設定
+
+クライアントシークレットにも対応していますが、確認用の一時利用に限定し、本運用は証明書を推奨します。
 
 ## Microsoft Graph設定方法
 
-後続STEPで以下のAPIを使用します。
+以下のAPIを使用します。
 
 - ユーザー検索：`/users`
 - SharePointサイト・ドライブ参照：`/sites`、`/drives`
@@ -145,7 +186,7 @@ SharePoint、OneDrive、実メールへ接続するSTEPで、バックエンド�
 - Office文書・PDFのWeb URL取得：DriveItemの`webUrl`
 - 通知メール送信：`/users/{sender}/sendMail`
 
-Graph接続処理は画面コンポーネントへ直接書かず、サービス層またはバックエンドへ分離します。
+ユーザー検索は`GET /users`から`id`、`displayName`、`mail`、`userPrincipalName`、`department`、`accountEnabled`だけを取得します。最大5,000名、5分間のバックエンドキャッシュを既定値とし、氏名・メール・部門を途中一致で検索します。Graph接続処理とアクセストークンはブラウザへ出しません。
 
 ## 必要Graph API権限
 
@@ -216,13 +257,13 @@ interface StorageProvider {
 
 ### CirculationCases
 
-`id`、`accessKeyHash`、`providerType`、`fileId`、`fileName`、`fileUrl`、`initiatorId`、`initiatorName`、`startedAt`、`updatedAt`、`state`、`currentMemberId`
+`id`、`accessKeyHash`、`title`（任意の回覧名）、`providerType`、`fileId`、`fileName`、`fileUrl`、`initiatorId`、`initiatorName`、`startedAt`、`updatedAt`、`state`、`currentMemberId`
 
 本接続時はランダムアクセスキーの平文ではなくハッシュ保存を検討します。
 
 ### CirculationMembers
 
-`id`、`caseId`、`approverId`、`name`、`email`、`department`、`sequence`、`requiresStamp`、`status`、`completedAt`
+`id`、`caseId`、`approverId`、`name`、`email`、`department`、`sequence`、`isInitiator`、`requiresStamp`、`status`、`completedAt`
 
 ### CirculationHistory
 
@@ -233,27 +274,37 @@ interface StorageProvider {
 ## 実装済み機能
 
 - 水色基調のPC向け業務UI
-- スマートフォン表示で開閉できるメニュー
+- ホームに案件一覧を常時表示し、上部のボタンから新しい回覧と承認者マスタを別ウィンドウで開く単一導線
+- 別ウィンドウで変更したローカルデータの自動同期
 - 承認者マスタの一覧・登録・編集・削除・無効化・検索
 - 300ms debounce付き承認者オートコンプリート
-- 氏名・メール・部門検索と重複警告
+- 氏名・メール・部門検索と、承認者マスタへの重複登録警告
+- Microsoft Graphの社内ユーザー検索API
+- 社内名簿ユーザーを回付ルートへ直接追加
+- 社内名簿ユーザーを承認者マスタへ登録
+- Entra IDに部門がないユーザーの表示・登録
 - 回付ルート作成、ドラッグ、上下移動、削除、捺印要否変更
+- 再確認のため、同じ承認者を1つの回付ルートへ複数回追加
+- 任意の回覧名入力（未入力時は文書名を使用）
+- 回覧開始者を先頭に含む回付ルートと、開始者以外の行のドラッグ並べ替え
+- 保存済みの開始者名を固定表示し、「変更」を押したときだけ氏名・メール・部門から検索して再選択
 - ルートテンプレートの保存・読込・上書き・複製・削除
 - 複数のダミー文書選択と、文書ごとの「捺印対象 / 確認のみ」設定
 - 文書・回付ルートの設定後に回覧を開始する縦型の操作導線
 - 案件開始とランダムな案件専用URL発行
 - 案件一覧、案件詳細、現在の確認者、進捗、履歴
 - 回付ルート内の処理履歴・差し戻し内容表示
-- 回付者ごとの捺印・確認アイコン表示
-- 確認OK、捺印済み回付、NG差し戻し
+- 現在の承認待ち者を強調し、その人の回付ルート行へ対象文書と処理操作を集約
+- 差し戻し前の結果を残し、戻り先から「差し戻し後の回付ルート」を新しい連番で再表示
+- 回付者ごとの「捺印あり／確認のみ」文字ラベル表示
+- 確認完了、捺印・確認完了、差し戻し
 - 未処理ルートの途中追加・削除・並べ替え・捺印要否変更
 - Webアプリ内のメール作成・編集・送信デモ
+- 回覧開始直後の、最初の回付者向け承認依頼メール下書き
 - LocalStorage保存とデモデータ初期化
 
 ## 未実装機能
 
-- バックエンドからのMicrosoft Graphアプリ接続
-- Microsoft Graphユーザー検索
 - SharePoint / OneDrive実ファイル参照
 - Office for the web / PDF実ファイル起動
 - SharePoint Listsへのデータ保存
@@ -271,17 +322,25 @@ interface StorageProvider {
 - 証明書や秘密鍵をGitへコミットしない
 - 印影・署名画像をアプリへ保存しない
 - Graph権限はSTEPごとに最小権限で追加
+- STEP 4のGraph権限はApplication `User.Read.All`のみ
+- Graphアクセストークンはバックエンド内だけで使用
+- 社内名簿APIは許可した接続元だけにCORS応答
 - メール送信権限は専用メールボックスへ限定
 - ランダム案件URLは転送可能なため、URL漏えいリスクを運用上明示
 
 ## 制約事項
 
 - STEP 1のデータは現在のブラウザだけに保存されます
+- 選択した開始者も同じブラウザでは保持されますが、別PC・別ブラウザ・プライベートブラウズ・ブラウザデータ消去後は再選択が必要です
 - `localhost`の案件URLは別PCから開けません
 - 「メール送信」はUIデモで、実際のメールは送られません
 - ファイル一覧と「文書を開く」はダミーです
 - PDFへの捺印有無を自動判定しません
 - 同時更新、排他制御、ネットワーク障害対策は未実装です
+- 本人認証を行わないため、社内名簿APIを公開インターネットへ直接公開しないでください
+- 5,000名を超えるテナントは`GRAPH_DIRECTORY_MAX_USERS`と検索方式の再検討が必要です
+- Graphユーザー情報は既定で最大5分遅れて反映されます
+- 実テナント接続はTenant ID、Client ID、証明書、管理者同意の準備後に確認します
 - スマートフォンよりPCブラウザを優先しています
 
 ## 開発STEP
@@ -290,7 +349,7 @@ interface StorageProvider {
 - [x] STEP 1：完全ローカルUIモック
 - [x] STEP 2：Git管理用ファイル整備
 - [x] STEP 3：利用者ログイン不要の方式へ変更（バックエンド接続は後続STEP）
-- [ ] STEP 4：Microsoft Graphユーザー検索
+- [x] STEP 4：Microsoft Graphユーザー検索（実テナント疎通は接続情報設定後）
 - [ ] STEP 5：SharePointファイル参照
 - [ ] STEP 6：OneDriveファイル参照
 - [ ] STEP 7：実ファイルを開く
@@ -301,15 +360,10 @@ interface StorageProvider {
 - [ ] STEP 12：共有フォルダ対応
 - [ ] STEP 13：実メール通知
 
-## GitHubへ登録する場合
+## リポジトリと公開版
 
-リモートリポジトリはまだ設定していません。登録先が決まった後に以下を実行します。
+- リポジトリ：<https://github.com/waragamef-png/approval-circulation-app>
+- 画面確認用GitHub Pages：<https://waragamef-png.github.io/approval-circulation-app/>
+- `main`へpushするとGitHub Actionsが型検査とビルドを行い、GitHub Pagesへ反映します。
 
-```bash
-git add .
-git commit -m "feat: add approval circulation step 1 mock"
-git remote add origin <repository-url>
-git push -u origin main
-```
-
-指定されていないGitHubリポジトリへ自動でpushしません。
+GitHub Pagesはダミーデータだけを使う画面確認用です。会社の実データやMicrosoft 365接続情報は登録しません。

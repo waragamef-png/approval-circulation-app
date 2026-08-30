@@ -21,6 +21,7 @@ export interface RouteMember {
   department: string;
   sequence: number;
   requiresStamp: boolean;
+  isInitiator?: boolean;
   status: MemberStatus;
   completedAt?: string;
 }
@@ -39,14 +40,17 @@ export interface HistoryEntry {
   id: string;
   caseId: string;
   actionUserId: string;
+  actionMemberId?: string;
   actionUserName: string;
   action: string;
   comment?: string;
   returnToUserId?: string;
+  returnToMemberId?: string;
   returnToUserName?: string;
   previousState: string;
   newState: string;
   createdAt: string;
+  routeSnapshot?: RouteMember[];
 }
 
 export interface CaseDocument {
@@ -62,6 +66,7 @@ export interface CaseDocument {
 export interface CirculationCase {
   id: string;
   accessKey: string;
+  title?: string;
   provider: ProviderType;
   fileId: string;
   fileName: string;
