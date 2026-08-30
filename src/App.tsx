@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { mockFiles } from "./mockData";
 import { loadData, resetData, saveData, STORAGE_KEY } from "./storage";
 import { directorySearchEnabled, searchDirectoryUsers, type DirectoryUser } from "./services/directory";
+import { listSharePointFiles, sharePointFileListingEnabled } from "./services/sharepoint";
 import type {
   AppData,
   Approver,
@@ -540,16 +541,50 @@ function NewCirculationPage({ data, currentUser, setTemplates, onStart, notify }
         </section>
       <section className="panel start-section"><div><h2>回覧を開始</h2><p>{circulationName.trim() || "文書名を回覧名として使用"} ・ 文書 {selectedDocuments.length}件 ・ 回付者 {route.length}名</p>{!canStart && <small>{selectedDocuments.length === 0 ? "文書を選択してください" : "開始者以外の回付者を追加してください"}</small>}</div><button className="primary-button large-button" disabled={!canStart} onClick={start}>回覧を開始する</button></section>
     </div>
-    {filePicker && <FilePicker provider={provider} selectedIds={selectedDocuments.map((item) => item.fileId)} onClose={() => setFilePicker(false)} onConfirm={(files) => { const existing = new Map(selectedDocuments.map((item) => [item.fileId, item])); setSelectedDocuments(files.map((file) => existing.get(file.id) ?? { id: uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: "#demo-document", requiresStamp: false })); setFilePicker(false); notify(`${files.length}件の文書を選択しました`); }} />}
+    {filePicker && <FilePicker provider={provider} selectedIds={selectedDocuments.map((item) => item.fileId)} onClose={() => setFilePicker(false)} onConfirm={(files) => { const existing = new Map(selectedDocuments.map((item) => [item.fileId, item])); setSelectedDocuments(files.map((file) => { const previous = existing.get(file.id); return { id: previous?.id ?? uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: file.fileUrl, requiresStamp: previous?.requiresStamp ?? false }; })); setFilePicker(false); notify(`${files.length}件の文書を選択しました`); }} />}
     {saveModal && <TemplateSaveModal currentUser={currentUser} route={recipients} onClose={() => setSaveModal(false)} onSave={(template) => { setTemplates([...data.templates, template]); setSelectedTemplateId(template.id); setSaveModal(false); notify(`「${template.name}」を保存しました`); }} />}
   </div>;
 }
 
 function FilePicker({ provider, selectedIds, onClose, onConfirm }: { provider: ProviderType; selectedIds: string[]; onClose: () => void; onConfirm: (files: MockFile[]) => void }) {
-  const files = mockFiles.filter((item) => item.provider === provider);
+  const useSharePoint = provider === "sharepoint" && sharePointFileListingEnabled;
+  const [files, setFiles] = useState<MockFile[]>(() => useSharePoint ? [] : mockFiles.filter((item) => item.provider === provider));
   const [draftIds, setDraftIds] = useState(selectedIds);
+  const [loading, setLoading] = useState(useSharePoint);
+  const [error, setError] = useState("");
+  const [sourceLabel, setSourceLabel] = useState("");
+  const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    if (!useSharePoint) {
+      setFiles(mockFiles.filter((item) => item.provider === provider));
+      setLoading(false);
+      setError("");
+      setSourceLabel("");
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setSourceLabel("");
+    listSharePointFiles(controller.signal)
+      .then((result) => {
+        setFiles(result.files);
+        setSourceLabel([result.siteName, result.libraryName, result.folderPath].filter(Boolean).join(" / "));
+      })
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        setFiles([]);
+        setError(caught instanceof Error ? caught.message : "SharePointの文書一覧を取得できませんでした。");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [provider, reloadCount, useSharePoint]);
+
   const toggle = (id: string) => setDraftIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  return <Modal title="文書を選択" onClose={onClose} wide><div className="modal-body"><div className="demo-banner">現在は確認用のダミーファイルです。複数選択できます。</div><div className="file-grid">{files.map((file) => { const selected = draftIds.includes(file.id); return <button key={file.id} className={`file-choice ${selected ? "selected" : ""}`} onClick={() => toggle(file.id)}><span className={`file-type-label large ${fileClass(file.type)}`}>{fileLabel(file.type)}</span><span><strong>{file.name}</strong><small>更新：{formatDate(file.updatedAt)} ・ {file.updatedBy}</small></span><em>{selected ? "選択済み" : "選択"}</em></button>; })}</div></div><div className="modal-footer"><span className="selection-count">{draftIds.length}件選択</span><button className="quiet-button" onClick={onClose}>キャンセル</button><button className="primary-button" disabled={draftIds.length === 0} onClick={() => onConfirm(files.filter((file) => draftIds.includes(file.id)))}>選択を確定</button></div></Modal>;
+  return <Modal title="文書を選択" onClose={onClose} wide><div className="modal-body">{useSharePoint ? sourceLabel && <div className="source-banner">SharePoint：{sourceLabel}</div> : <div className="demo-banner">現在は確認用のダミーファイルです。複数選択できます。</div>}{loading && <div className="file-picker-state">SharePointから文書を取得しています…</div>}{error && <div className="file-picker-state error"><span>{error}</span><button className="secondary-button" onClick={() => setReloadCount((value) => value + 1)}>再読み込み</button></div>}{!loading && !error && files.length === 0 && <div className="file-picker-state">表示できる文書がありません</div>}{!loading && !error && <div className="file-grid">{files.map((file) => { const selected = draftIds.includes(file.id); return <button key={file.id} className={`file-choice ${selected ? "selected" : ""}`} onClick={() => toggle(file.id)}><span className={`file-type-label large ${fileClass(file.type)}`}>{fileLabel(file.type)}</span><span><strong>{file.name}</strong><small>更新：{file.updatedAt ? formatDate(file.updatedAt) : "日時不明"} ・ {file.updatedBy}</small></span><em>{selected ? "選択済み" : "選択"}</em></button>; })}</div>}</div><div className="modal-footer"><span className="selection-count">{draftIds.filter((id) => files.some((file) => file.id === id)).length}件選択</span><button className="quiet-button" onClick={onClose}>キャンセル</button><button className="primary-button" disabled={loading || Boolean(error) || !draftIds.some((id) => files.some((file) => file.id === id))} onClick={() => onConfirm(files.filter((file) => draftIds.includes(file.id)))}>選択を確定</button></div></Modal>;
 }
 
 function TemplateSaveModal({ currentUser, route, onClose, onSave }: { currentUser: Approver; route: RouteMember[]; onClose: () => void; onSave: (template: RouteTemplate) => void }) {

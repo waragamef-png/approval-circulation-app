@@ -98,4 +98,5 @@ export interface MockFile {
   location: string;
   updatedAt: string;
   updatedBy: string;
+  fileUrl: string;
 }

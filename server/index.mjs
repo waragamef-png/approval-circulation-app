@@ -6,6 +6,7 @@ import cors from "cors";
 import express from "express";
 import { createAccessTokenProvider, isGraphConfigured } from "./graphAuth.mjs";
 import { createGraphDirectory } from "./graphDirectory.mjs";
+import { createGraphSharePoint, isSharePointTargetConfigured } from "./graphSharePoint.mjs";
 
 const app = express();
 const port = Number(process.env.APP_PORT || 3000);
@@ -24,10 +25,21 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "32kb" }));
 
+let accessTokenProviderPromise;
+function getAccessTokenProvider() {
+  if (!accessTokenProviderPromise) {
+    accessTokenProviderPromise = createAccessTokenProvider().catch((error) => {
+      accessTokenProviderPromise = undefined;
+      throw error;
+    });
+  }
+  return accessTokenProviderPromise;
+}
+
 let directoryPromise;
 async function getDirectory() {
   if (!directoryPromise) {
-    directoryPromise = createAccessTokenProvider()
+    directoryPromise = getAccessTokenProvider()
       .then((acquireAccessToken) => createGraphDirectory({
         acquireAccessToken,
         cacheTtlMs: Number(process.env.GRAPH_DIRECTORY_CACHE_TTL_MS || 300_000),
@@ -41,8 +53,29 @@ async function getDirectory() {
   return directoryPromise;
 }
 
+let sharePointPromise;
+async function getSharePoint() {
+  if (!sharePointPromise) {
+    sharePointPromise = getAccessTokenProvider()
+      .then((acquireAccessToken) => createGraphSharePoint({
+        acquireAccessToken,
+        hostname: process.env.SHAREPOINT_HOSTNAME || process.env.VITE_SHAREPOINT_HOSTNAME,
+        sitePath: process.env.SHAREPOINT_SITE_PATH || process.env.VITE_SHAREPOINT_SITE_PATH,
+        libraryName: process.env.SHAREPOINT_LIBRARY_NAME,
+        folderPath: process.env.SHAREPOINT_FOLDER_PATH,
+        cacheTtlMs: Number(process.env.SHAREPOINT_CACHE_TTL_MS || 60_000),
+        maxFiles: Number(process.env.SHAREPOINT_MAX_FILES || 500),
+      }))
+      .catch((error) => {
+        sharePointPromise = undefined;
+        throw error;
+      });
+  }
+  return sharePointPromise;
+}
+
 app.get("/api/health", (_request, response) => {
-  response.json({ status: "ok", graphConfigured: isGraphConfigured() });
+  response.json({ status: "ok", graphConfigured: isGraphConfigured(), sharePointConfigured: isSharePointTargetConfigured() });
 });
 
 app.get("/api/directory/users", async (request, response) => {
@@ -58,6 +91,20 @@ app.get("/api/directory/users", async (request, response) => {
   } catch (error) {
     console.error("Directory search failed:", error instanceof Error ? error.message : error);
     return response.status(502).json({ message: "Microsoft 365の社内名簿を取得できませんでした。" });
+  }
+});
+
+app.get("/api/sharepoint/files", async (_request, response) => {
+  if (!isGraphConfigured()) return response.status(503).json({ message: "Microsoft 365連携が未設定です。" });
+  if (!isSharePointTargetConfigured()) return response.status(503).json({ message: "SharePointの参照先が未設定です。" });
+
+  try {
+    const sharePoint = await getSharePoint();
+    const result = await sharePoint.listFiles();
+    return response.json({ source: "microsoft-graph", ...result });
+  } catch (error) {
+    console.error("SharePoint file listing failed:", error instanceof Error ? error.message : error);
+    return response.status(502).json({ message: "SharePointの文書一覧を取得できませんでした。" });
   }
 });
 
@@ -79,4 +126,5 @@ app.use((error, _request, response, _next) => {
 app.listen(port, host, () => {
   console.log(`社内承認回覧サーバー: http://${host}:${port}`);
   console.log(`Microsoft 365ユーザー検索: ${isGraphConfigured() ? "設定済み" : "未設定（ローカルデータを使用）"}`);
+  console.log(`SharePoint文書参照: ${isGraphConfigured() && isSharePointTargetConfigured() ? "設定済み" : "未設定（確認用データを使用）"}`);
 });

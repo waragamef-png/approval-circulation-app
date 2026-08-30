@@ -244,6 +244,9 @@ select:focus, .circulation-name-field input:focus, .form-grid input:focus, .form
 .demo-banner span { border-radius: 4px; padding: 3px 6px; color: white; background: var(--accent); font-size: 10px; font-weight: 800; }
 .demo-banner.neutral { color: #536079; background: #f1f4f8; }
 .demo-banner.neutral span { background: #5b6e8f; }
+.source-banner { margin-bottom: 16px; padding: 10px 12px; border-radius: 7px; color: #236f94; background: #eaf8ff; font-size: 12px; font-weight: 700; }
+.file-picker-state { min-height: 120px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px dashed #c9dce7; border-radius: 8px; padding: 22px; color: var(--muted); background: #f8fcff; font-size: 12px; text-align: center; }
+.file-picker-state.error { color: var(--danger); border-color: #dfb8b5; background: #fff7f6; }
 .file-grid { display: grid; gap: 9px; }
 .file-choice { display: flex; align-items: center; gap: 13px; border: 1px solid var(--line); border-radius: 9px; padding: 12px; color: var(--ink); background: white; text-align: left; }
 .file-choice:hover, .file-choice.selected { border-color: #9cabc0; background: #f9fafc; }

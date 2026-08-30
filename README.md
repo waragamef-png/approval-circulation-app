@@ -76,13 +76,15 @@ approval-circulation-app/
 │  ├─ styles.css                 共通スタイル
 │  ├─ types.ts                   ドメインモデル
 │  ├─ services/
-│  │  └─ directory.ts            社内ユーザー検索APIクライアント
+│  │  ├─ directory.ts            社内ユーザー検索APIクライアント
+│  │  └─ sharepoint.ts           SharePoint文書一覧APIクライアント
 │  └─ providers/
 │     └─ StorageProvider.ts      ストレージ共通インターフェース
 ├─ server/
 │  ├─ index.mjs                  Express API・ビルド済み画面の配信
 │  ├─ graphAuth.mjs              MSALによるアプリ認証
-│  └─ graphDirectory.mjs         Graphユーザー取得・検索・キャッシュ
+│  ├─ graphDirectory.mjs         Graphユーザー取得・検索・キャッシュ
+│  └─ graphSharePoint.mjs        SharePoint文書一覧取得・キャッシュ
 ├─ .env.example                  環境変数の記入例
 ├─ .gitignore
 ├─ index.html
@@ -203,15 +205,28 @@ STEP 1では、回覧開始・承認・差し戻し・再回覧の内容を案�
 
 ## SharePoint設定方法
 
-STEP 5で対象サイトを指定し、GraphからドキュメントライブラリとDriveItemを取得します。
+STEP 5では、会社PCのバックエンドから対象サイトのドキュメントライブラリとDriveItemを読み取り専用で取得します。ブラウザへGraphアクセストークンを渡しません。
 
 推奨手順：
 
 1. 専用サイトまたは既存対象サイトを決定
 2. アプリへ対象サイトだけの権限を付与
-3. PDF、Excelを優先して一覧表示
-4. DriveItem ID、ファイル名、更新日時、更新者、保存場所、`webUrl`を保持
-5. Office文書はOffice for the webで元ファイルを開く
+3. `.env`へ`SHAREPOINT_HOSTNAME`と`SHAREPOINT_SITE_PATH`を設定
+4. 必要なら`SHAREPOINT_LIBRARY_NAME`と`SHAREPOINT_FOLDER_PATH`で参照範囲を限定
+5. PDF、Excelを優先して一覧表示
+6. DriveItem ID、ファイル名、更新日時、更新者、保存場所、`webUrl`を保持
+7. Office文書はSTEP 7でOffice for the webから元ファイルを開く
+
+設定値の例：
+
+```dotenv
+SHAREPOINT_HOSTNAME=example.sharepoint.com
+SHAREPOINT_SITE_PATH=/sites/approval-circulation
+SHAREPOINT_LIBRARY_NAME=共有ドキュメント
+SHAREPOINT_FOLDER_PATH=回覧対象
+```
+
+`SHAREPOINT_LIBRARY_NAME`を空にすると最初のドキュメントライブラリ、`SHAREPOINT_FOLDER_PATH`を空にするとライブラリ直下を参照します。サイト全体への広い権限ではなくApplication `Sites.Selected`を優先し、対象サイトへ読み取り権限だけを付与します。
 
 ## OneDrive設定方法
 
@@ -280,6 +295,10 @@ interface StorageProvider {
 - 300ms debounce付き承認者オートコンプリート
 - 氏名・メール・部門検索と、承認者マスタへの重複登録警告
 - Microsoft Graphの社内ユーザー検索API
+- Microsoft GraphによるSharePoint対象サイトと文書ライブラリの参照API
+- SharePointのPDF・Excel・Word・PowerPoint一覧取得（PDF・Excelを優先表示）
+- SharePoint文書のDriveItem ID、更新日時、更新者、保存場所、`webUrl`保持
+- SharePoint未設定時の確認用データ表示と、接続失敗時の日本語エラー・再読み込み
 - 社内名簿ユーザーを回付ルートへ直接追加
 - 社内名簿ユーザーを承認者マスタへ登録
 - Entra IDに部門がないユーザーの表示・登録
@@ -289,7 +308,7 @@ interface StorageProvider {
 - 回覧開始者を先頭に含む回付ルートと、開始者以外の行のドラッグ並べ替え
 - 保存済みの開始者名を固定表示し、「変更」を押したときだけ氏名・メール・部門から検索して再選択
 - ルートテンプレートの保存・読込・上書き・複製・削除
-- 複数のダミー文書選択と、文書ごとの「捺印対象 / 確認のみ」設定
+- SharePointまたは確認用データからの複数文書選択と、文書ごとの「捺印対象 / 確認のみ」設定
 - 文書・回付ルートの設定後に回覧を開始する縦型の操作導線
 - 案件開始とランダムな案件専用URL発行
 - 案件一覧、案件詳細、現在の確認者、進捗、履歴
@@ -305,7 +324,7 @@ interface StorageProvider {
 
 ## 未実装機能
 
-- SharePoint / OneDrive実ファイル参照
+- OneDrive実ファイル参照
 - Office for the web / PDF実ファイル起動
 - SharePoint Listsへのデータ保存
 - 複数PC間での案件共有
@@ -323,6 +342,7 @@ interface StorageProvider {
 - 印影・署名画像をアプリへ保存しない
 - Graph権限はSTEPごとに最小権限で追加
 - STEP 4のGraph権限はApplication `User.Read.All`のみ
+- STEP 5のSharePoint権限はApplication `Sites.Selected`を優先し、対象サイトを読み取り専用に限定
 - Graphアクセストークンはバックエンド内だけで使用
 - 社内名簿APIは許可した接続元だけにCORS応答
 - メール送信権限は専用メールボックスへ限定
@@ -334,13 +354,15 @@ interface StorageProvider {
 - 選択した開始者も同じブラウザでは保持されますが、別PC・別ブラウザ・プライベートブラウズ・ブラウザデータ消去後は再選択が必要です
 - `localhost`の案件URLは別PCから開けません
 - 「メール送信」はUIデモで、実際のメールは送られません
-- ファイル一覧と「文書を開く」はダミーです
+- GitHub Pages版とMicrosoft 365未設定時のファイル一覧は確認用データです
+- SharePoint実接続時も「文書を開く」はSTEP 7まで確認表示です
+- SharePoint一覧は設定した文書ライブラリ直下、または指定フォルダ直下だけを取得します
 - PDFへの捺印有無を自動判定しません
 - 同時更新、排他制御、ネットワーク障害対策は未実装です
 - 本人認証を行わないため、社内名簿APIを公開インターネットへ直接公開しないでください
 - 5,000名を超えるテナントは`GRAPH_DIRECTORY_MAX_USERS`と検索方式の再検討が必要です
 - Graphユーザー情報は既定で最大5分遅れて反映されます
-- 実テナント接続はTenant ID、Client ID、証明書、管理者同意の準備後に確認します
+- 実テナント接続はTenant ID、Client ID、証明書、管理者同意、対象SharePointサイトの読み取り権限準備後に確認します
 - スマートフォンよりPCブラウザを優先しています
 
 ## 開発STEP
@@ -350,7 +372,7 @@ interface StorageProvider {
 - [x] STEP 2：Git管理用ファイル整備
 - [x] STEP 3：利用者ログイン不要の方式へ変更（バックエンド接続は後続STEP）
 - [x] STEP 4：Microsoft Graphユーザー検索（実テナント疎通は接続情報設定後）
-- [ ] STEP 5：SharePointファイル参照
+- [x] STEP 5：SharePointファイル参照（実テナント疎通は接続情報設定後）
 - [ ] STEP 6：OneDriveファイル参照
 - [ ] STEP 7：実ファイルを開く
 - [ ] STEP 8：SharePoint Listsへ保存

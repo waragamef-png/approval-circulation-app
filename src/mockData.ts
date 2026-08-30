@@ -3,11 +3,11 @@ import type { AppData, MockFile, RouteMember } from "./types";
 const now = "2026-08-10T09:00:00+09:00";
 
 export const mockFiles: MockFile[] = [
-  { id: "sp-001", provider: "sharepoint", name: "2026年度_製品仕様書.pdf", type: "PDF", location: "技術部 / 製品開発", updatedAt: "2026-08-09T16:40:00+09:00", updatedBy: "佐藤 花子" },
-  { id: "sp-002", provider: "sharepoint", name: "品質検査チェックリスト.xlsx", type: "Excel", location: "品質保証部 / 品質文書", updatedAt: "2026-08-08T14:10:00+09:00", updatedBy: "田中 一郎" },
-  { id: "od-001", provider: "onedrive", name: "設備投資申請書.xlsx", type: "Excel", location: "マイファイル / 申請書", updatedAt: "2026-08-10T08:20:00+09:00", updatedBy: "藤原 美咲" },
-  { id: "od-002", provider: "onedrive", name: "新製品企画書.pptx", type: "PowerPoint", location: "マイファイル / 企画", updatedAt: "2026-08-07T17:35:00+09:00", updatedBy: "藤原 美咲" },
-  { id: "sf-001", provider: "shared-folder", name: "月次実績報告.xlsx", type: "Excel", location: "\\\\fileserver\\管理部\\月次", updatedAt: "2026-08-10T07:50:00+09:00", updatedBy: "佐藤 花子" },
+  { id: "sp-001", provider: "sharepoint", name: "2026年度_製品仕様書.pdf", type: "PDF", location: "技術部 / 製品開発", updatedAt: "2026-08-09T16:40:00+09:00", updatedBy: "佐藤 花子", fileUrl: "#demo-document" },
+  { id: "sp-002", provider: "sharepoint", name: "品質検査チェックリスト.xlsx", type: "Excel", location: "品質保証部 / 品質文書", updatedAt: "2026-08-08T14:10:00+09:00", updatedBy: "田中 一郎", fileUrl: "#demo-document" },
+  { id: "od-001", provider: "onedrive", name: "設備投資申請書.xlsx", type: "Excel", location: "マイファイル / 申請書", updatedAt: "2026-08-10T08:20:00+09:00", updatedBy: "藤原 美咲", fileUrl: "#demo-document" },
+  { id: "od-002", provider: "onedrive", name: "新製品企画書.pptx", type: "PowerPoint", location: "マイファイル / 企画", updatedAt: "2026-08-07T17:35:00+09:00", updatedBy: "藤原 美咲", fileUrl: "#demo-document" },
+  { id: "sf-001", provider: "shared-folder", name: "月次実績報告.xlsx", type: "Excel", location: "\\\\fileserver\\管理部\\月次", updatedAt: "2026-08-10T07:50:00+09:00", updatedBy: "佐藤 花子", fileUrl: "#demo-document" },
 ];
 
 const approvers = [
