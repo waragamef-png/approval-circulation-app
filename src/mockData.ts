@@ -3,8 +3,6 @@ import type { AppData, MockFile, RouteMember } from "./types";
 const now = "2026-08-10T09:00:00+09:00";
 
 export const mockFiles: MockFile[] = [
-  { id: "od-001", provider: "onedrive", name: "設備投資申請書.xlsx", type: "Excel", location: "マイファイル / 申請書", updatedAt: "2026-08-10T08:20:00+09:00", updatedBy: "藤原 美咲", fileUrl: "#demo-document" },
-  { id: "od-002", provider: "onedrive", name: "新製品企画書.pptx", type: "PowerPoint", location: "マイファイル / 企画", updatedAt: "2026-08-07T17:35:00+09:00", updatedBy: "藤原 美咲", fileUrl: "#demo-document" },
   { id: "sf-001", provider: "shared-folder", name: "月次実績報告.xlsx", type: "Excel", location: "\\\\fileserver\\管理部\\月次", updatedAt: "2026-08-10T07:50:00+09:00", updatedBy: "佐藤 花子", fileUrl: "#demo-document" },
 ];
 

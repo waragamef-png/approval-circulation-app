@@ -66,19 +66,23 @@ function fileTypeFromName(name: string) {
   return "Word";
 }
 
-function sharePointUrl(value: string) {
+type LinkProvider = Extract<ProviderType, "sharepoint" | "onedrive">;
+
+function documentLinkUrl(value: string, provider?: LinkProvider) {
   try {
     const url = new URL(value.trim());
     const hostname = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || (hostname !== "sharepoint.com" && !hostname.endsWith(".sharepoint.com"))) return undefined;
+    const isSharePoint = hostname === "sharepoint.com" || hostname.endsWith(".sharepoint.com");
+    const isOneDrive = isSharePoint || hostname === "1drv.ms" || hostname === "onedrive.live.com";
+    if (url.protocol !== "https:" || (provider === "sharepoint" ? !isSharePoint : !isOneDrive)) return undefined;
     return url.toString();
   } catch {
     return undefined;
   }
 }
 
-function fileNameFromSharePointUrl(value: string) {
-  const normalized = sharePointUrl(value);
+function fileNameFromDocumentUrl(value: string, provider: LinkProvider) {
+  const normalized = documentLinkUrl(value, provider);
   if (!normalized) return "";
   const segments = new URL(normalized).pathname.split("/").filter(Boolean).reverse();
   const candidate = segments.find((segment) => /\.(pdf|xlsx?|xlsm|docx?|pptx?)$/i.test(segment));
@@ -91,7 +95,7 @@ function fileNameFromSharePointUrl(value: string) {
 }
 
 function DocumentOpenLink({ document, notify }: { document: CaseDocument; notify: (message: string) => void }) {
-  const url = sharePointUrl(document.fileUrl);
+  const url = documentLinkUrl(document.fileUrl);
   if (!url) {
     return <button className="document-button" onClick={() => notify("確認用文書のため、実ファイルは開きません")}>文書を開く</button>;
   }
@@ -566,9 +570,9 @@ function NewCirculationPage({ data, currentUser, setTemplates, onStart, notify }
   };
 
   return <div className="page">
-    <PageHeading title="新しい回覧" help={<ol><li>SharePointで文書のリンクをコピーし、ファイル名と一緒に追加します。</li><li>文書ごとの捺印要否を設定します。</li><li>開始者はルートの先頭へ自動で入り、同じ人も複数回追加できます。</li><li>承認者を追加し、ドラッグまたは「上へ／下へ」で並べ替えます。</li></ol>} />
+    <PageHeading title="新しい回覧" help={<ol><li>SharePointまたはOneDriveで文書のリンクをコピーし、ファイル名と一緒に追加します。</li><li>文書ごとの捺印要否を設定します。</li><li>開始者はルートの先頭へ自動で入り、同じ人も複数回追加できます。</li><li>承認者を追加し、ドラッグまたは「上へ／下へ」で並べ替えます。</li></ol>} />
     <div className="builder-main">
-        <section className="panel form-section"><label className="circulation-name-field"><span className="field-label">回覧名（任意）</span><input value={circulationName} onChange={(event) => setCirculationName(event.target.value)} placeholder="未入力の場合は文書名を表示" maxLength={100} /><small>{circulationName.length} / 100</small></label><div className="number-title"><b>1</b><h2>対象文書</h2></div><div className="document-source"><label><span className="field-label">保存場所</span><select value={provider} onChange={(event) => { setProvider(event.target.value as ProviderType); setSelectedDocuments([]); }}><option value="sharepoint">SharePoint</option><option value="onedrive">OneDrive</option><option value="shared-folder">共有フォルダ</option></select></label><button className="secondary-button" onClick={() => setFilePicker(true)}>{provider === "sharepoint" ? "SharePointリンクを追加" : "文書を選択"}</button></div>
+        <section className="panel form-section"><label className="circulation-name-field"><span className="field-label">回覧名（任意）</span><input value={circulationName} onChange={(event) => setCirculationName(event.target.value)} placeholder="未入力の場合は文書名を表示" maxLength={100} /><small>{circulationName.length} / 100</small></label><div className="number-title"><b>1</b><h2>対象文書</h2></div><div className="document-source"><label><span className="field-label">保存場所</span><select value={provider} onChange={(event) => { setProvider(event.target.value as ProviderType); setSelectedDocuments([]); }}><option value="sharepoint">SharePoint</option><option value="onedrive">OneDrive</option><option value="shared-folder">共有フォルダ</option></select></label><button className="secondary-button" onClick={() => setFilePicker(true)}>{provider === "shared-folder" ? "文書を選択" : `${providerLabels[provider]}リンクを追加`}</button></div>
           {selectedDocuments.length === 0 ? <div className="document-empty">文書が選択されていません</div> : <div className="selected-documents">{selectedDocuments.map((document) => <div className="selected-document" key={document.id}><span className={`file-type-label ${fileClass(document.type)}`}>{fileLabel(document.type)}</span><div className="selected-document-main"><strong>{document.name}</strong></div><div className="document-action-choice" aria-label={`${document.name}の処理`}><button className={document.requiresStamp ? "active stamp" : ""} onClick={() => setSelectedDocuments(selectedDocuments.map((item) => item.id === document.id ? { ...item, requiresStamp: true } : item))}>捺印対象</button><button className={!document.requiresStamp ? "active" : ""} onClick={() => setSelectedDocuments(selectedDocuments.map((item) => item.id === document.id ? { ...item, requiresStamp: false } : item))}>確認のみ</button></div><button className="document-remove" onClick={() => setSelectedDocuments(selectedDocuments.filter((item) => item.id !== document.id))}>削除</button></div>)}</div>}
         </section>
         <section className="panel form-section"><div className="number-title"><b>2</b><h2>回付ルート</h2></div><div className="template-bar"><select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}><option value="">ルートテンプレートを選択</option>{data.templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary-button" onClick={loadTemplate}>読み込み</button><span className="bar-divider" /><button className="text-button" disabled={!selectedTemplateId} onClick={overwrite}>上書き保存</button><button className="text-button" disabled={!selectedTemplateId} onClick={duplicateTemplate}>複製</button><button className="text-button danger-text" disabled={!selectedTemplateId} onClick={() => { const target = data.templates.find((item) => item.id === selectedTemplateId); if (target && window.confirm(`「${target.name}」を削除しますか？`)) { setTemplates(data.templates.filter((item) => item.id !== target.id)); setSelectedTemplateId(""); notify("テンプレートを削除しました"); } }}>削除</button></div>
@@ -580,8 +584,8 @@ function NewCirculationPage({ data, currentUser, setTemplates, onStart, notify }
         </section>
       <section className="panel start-section"><div><h2>回覧を開始</h2><p>{circulationName.trim() || "文書名を回覧名として使用"} ・ 文書 {selectedDocuments.length}件 ・ 回付者 {route.length}名</p>{!canStart && <small>{selectedDocuments.length === 0 ? "文書を選択してください" : "開始者以外の回付者を追加してください"}</small>}</div><button className="primary-button large-button" disabled={!canStart} onClick={start}>回覧を開始する</button></section>
     </div>
-    {filePicker && provider === "sharepoint" && <SharePointLinkModal onClose={() => setFilePicker(false)} onAdd={(file) => { if (selectedDocuments.some((document) => document.fileUrl === file.fileUrl)) { notify("同じSharePointリンクは追加済みです"); return; } setSelectedDocuments([...selectedDocuments, { id: uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: file.fileUrl, requiresStamp: false }]); setFilePicker(false); notify("SharePoint文書を追加しました"); }} />}
-    {filePicker && provider !== "sharepoint" && <FilePicker provider={provider} selectedIds={selectedDocuments.map((item) => item.fileId)} onClose={() => setFilePicker(false)} onConfirm={(files) => { const existing = new Map(selectedDocuments.map((item) => [item.fileId, item])); setSelectedDocuments(files.map((file) => { const previous = existing.get(file.id); return { id: previous?.id ?? uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: file.fileUrl, requiresStamp: previous?.requiresStamp ?? false }; })); setFilePicker(false); notify(`${files.length}件の文書を選択しました`); }} />}
+    {filePicker && provider !== "shared-folder" && <DocumentLinkModal provider={provider} onClose={() => setFilePicker(false)} onAdd={(file) => { const label = providerLabels[provider]; if (selectedDocuments.some((document) => document.fileUrl === file.fileUrl)) { notify(`同じ${label}リンクは追加済みです`); return; } setSelectedDocuments([...selectedDocuments, { id: uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: file.fileUrl, requiresStamp: false }]); setFilePicker(false); notify(`${label}文書を追加しました`); }} />}
+    {filePicker && provider === "shared-folder" && <FilePicker provider={provider} selectedIds={selectedDocuments.map((item) => item.fileId)} onClose={() => setFilePicker(false)} onConfirm={(files) => { const existing = new Map(selectedDocuments.map((item) => [item.fileId, item])); setSelectedDocuments(files.map((file) => { const previous = existing.get(file.id); return { id: previous?.id ?? uid("document"), fileId: file.id, name: file.name, type: file.type, location: file.location, fileUrl: file.fileUrl, requiresStamp: previous?.requiresStamp ?? false }; })); setFilePicker(false); notify(`${files.length}件の文書を選択しました`); }} />}
     {saveModal && <TemplateSaveModal currentUser={currentUser} route={recipients} onClose={() => setSaveModal(false)} onSave={(template) => { setTemplates([...data.templates, template]); setSelectedTemplateId(template.id); setSaveModal(false); notify(`「${template.name}」を保存しました`); }} />}
   </div>;
 }
@@ -593,20 +597,21 @@ function FilePicker({ provider, selectedIds, onClose, onConfirm }: { provider: P
   return <Modal title="文書を選択" onClose={onClose} wide><div className="modal-body"><div className="demo-banner">現在は確認用のダミーファイルです。複数選択できます。</div><div className="file-grid">{files.map((file) => { const selected = draftIds.includes(file.id); return <button key={file.id} className={`file-choice ${selected ? "selected" : ""}`} onClick={() => toggle(file.id)}><span className={`file-type-label large ${fileClass(file.type)}`}>{fileLabel(file.type)}</span><span><strong>{file.name}</strong><small>更新：{file.updatedAt ? formatDate(file.updatedAt) : "日時不明"} ・ {file.updatedBy}</small></span><em>{selected ? "選択済み" : "選択"}</em></button>; })}</div></div><div className="modal-footer"><span className="selection-count">{draftIds.filter((id) => files.some((file) => file.id === id)).length}件選択</span><button className="quiet-button" onClick={onClose}>キャンセル</button><button className="primary-button" disabled={!draftIds.some((id) => files.some((file) => file.id === id))} onClick={() => onConfirm(files.filter((file) => draftIds.includes(file.id)))}>選択を確定</button></div></Modal>;
 }
 
-function SharePointLinkModal({ onClose, onAdd }: { onClose: () => void; onAdd: (file: MockFile) => void }) {
+function DocumentLinkModal({ provider, onClose, onAdd }: { provider: LinkProvider; onClose: () => void; onAdd: (file: MockFile) => void }) {
   const [link, setLink] = useState("");
   const [name, setName] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [error, setError] = useState("");
-  const normalizedLink = sharePointUrl(link);
+  const label = providerLabels[provider];
+  const normalizedLink = documentLinkUrl(link, provider);
   const canAdd = Boolean(link.trim() && name.trim());
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!normalizedLink) { setError("SharePointでコピーしたhttpsリンクを貼り付けてください"); return; }
+    if (!normalizedLink) { setError(`${label}でコピーしたhttpsリンクを貼り付けてください`); return; }
     if (!name.trim()) { setError("ファイル名を入力してください"); return; }
-    onAdd({ id: uid("sharepoint-link"), provider: "sharepoint", name: name.trim(), type: fileTypeFromName(name), location: "SharePoint", updatedAt: "", updatedBy: "", fileUrl: normalizedLink });
+    onAdd({ id: uid(`${provider}-link`), provider, name: name.trim(), type: fileTypeFromName(name), location: label, updatedAt: "", updatedBy: "", fileUrl: normalizedLink });
   };
-  return <Modal title="SharePoint文書を追加" onClose={onClose}><form onSubmit={submit}><div className="modal-body form-grid"><label><span>SharePointリンク <b>必須</b></span><input type="url" value={link} onChange={(event) => { const value = event.target.value; setLink(value); setError(""); if (!nameEdited) setName(fileNameFromSharePointUrl(value)); }} placeholder="コピーしたリンクを貼り付け" autoFocus /></label><label><span>ファイル名 <b>必須</b></span><input value={name} onChange={(event) => { setName(event.target.value); setNameEdited(true); setError(""); }} placeholder="例：製品仕様書.pdf" /></label>{error && <div className="suggestion-error">{error}</div>}</div><div className="modal-footer"><button type="button" className="quiet-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={!canAdd}>追加する</button></div></form></Modal>;
+  return <Modal title={`${label}文書を追加`} onClose={onClose}><form onSubmit={submit}><div className="modal-body form-grid"><label><span>{label}リンク <b>必須</b></span><input type="url" value={link} onChange={(event) => { const value = event.target.value; setLink(value); setError(""); if (!nameEdited) setName(fileNameFromDocumentUrl(value, provider)); }} placeholder="コピーしたリンクを貼り付け" autoFocus /></label><label><span>ファイル名 <b>必須</b></span><input value={name} onChange={(event) => { setName(event.target.value); setNameEdited(true); setError(""); }} placeholder="例：製品仕様書.pdf" /></label>{error && <div className="suggestion-error">{error}</div>}</div><div className="modal-footer"><button type="button" className="quiet-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={!canAdd}>追加する</button></div></form></Modal>;
 }
 
 function TemplateSaveModal({ currentUser, route, onClose, onSave }: { currentUser: Approver; route: RouteMember[]; onClose: () => void; onSave: (template: RouteTemplate) => void }) {
