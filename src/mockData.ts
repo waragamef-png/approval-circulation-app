@@ -1,10 +1,6 @@
-import type { AppData, MockFile, RouteMember } from "./types";
+import type { AppData, RouteMember } from "./types";
 
 const now = "2026-08-10T09:00:00+09:00";
-
-export const mockFiles: MockFile[] = [
-  { id: "sf-001", provider: "shared-folder", name: "月次実績報告.xlsx", type: "Excel", location: "\\\\fileserver\\管理部\\月次", updatedAt: "2026-08-10T07:50:00+09:00", updatedBy: "佐藤 花子", fileUrl: "#demo-document" },
-];
 
 const approvers = [
   { id: "a-yamada", name: "山田 太郎", email: "taro.yamada@example.com", department: "技術部", entraUserId: "", active: true, createdAt: now, updatedAt: now },

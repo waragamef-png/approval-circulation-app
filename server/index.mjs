@@ -6,6 +6,7 @@ import cors from "cors";
 import express from "express";
 import { createAccessTokenProvider, isGraphConfigured } from "./graphAuth.mjs";
 import { createGraphDirectory } from "./graphDirectory.mjs";
+import { contentDisposition, createSharedFolderGateway, parseSharedFolderRoots, SharedFolderError } from "./sharedFolder.mjs";
 
 const app = express();
 const port = Number(process.env.APP_PORT || 3000);
@@ -14,6 +15,7 @@ const allowedOrigins = (process.env.APP_ALLOWED_ORIGINS || "http://localhost:517
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const sharedFolderGateway = createSharedFolderGateway({ roots: parseSharedFolderRoots(process.env.SHARED_FOLDER_ROOTS) });
 
 app.disable("x-powered-by");
 app.use(cors({
@@ -53,7 +55,7 @@ async function getDirectory() {
 }
 
 app.get("/api/health", (_request, response) => {
-  response.json({ status: "ok", graphConfigured: isGraphConfigured() });
+  response.json({ status: "ok", graphConfigured: isGraphConfigured(), sharedFolderConfigured: sharedFolderGateway.configured });
 });
 
 app.get("/api/directory/users", async (request, response) => {
@@ -69,6 +71,21 @@ app.get("/api/directory/users", async (request, response) => {
   } catch (error) {
     console.error("Directory search failed:", error instanceof Error ? error.message : error);
     return response.status(502).json({ message: "Microsoft 365の社内名簿を取得できませんでした。" });
+  }
+});
+
+app.get("/api/shared-files/open", async (request, response) => {
+  try {
+    const file = await sharedFolderGateway.resolveFile(request.query.path);
+    response.setHeader("Content-Disposition", contentDisposition(file.fileName, file.inline));
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    return response.sendFile(file.absolutePath);
+  } catch (error) {
+    if (error instanceof SharedFolderError) {
+      return response.status(error.statusCode).json({ message: error.message });
+    }
+    console.error("Shared folder open failed:", error instanceof Error ? error.message : error);
+    return response.status(500).json({ message: "共有フォルダのファイルを開けませんでした。" });
   }
 });
 
@@ -90,4 +107,5 @@ app.use((error, _request, response, _next) => {
 app.listen(port, host, () => {
   console.log(`社内承認回覧サーバー: http://${host}:${port}`);
   console.log(`Microsoft 365ユーザー検索: ${isGraphConfigured() ? "設定済み" : "未設定（ローカルデータを使用）"}`);
+  console.log(`共有フォルダ: ${sharedFolderGateway.configured ? "設定済み" : "未設定"}`);
 });
