@@ -89,9 +89,9 @@
 ### 3.5 複数文書と捺印
 
 - 1案件に複数文書を含められる。
-- SharePoint文書は、利用者がSharePointでコピーしたリンクとファイル名を登録する。
-- SharePoint内の自動一覧取得、Tenant ID、Client ID、`Sites.Selected`、管理者同意を使用しない。
-- 案件画面の「文書を開く」は登録したSharePointリンクを別画面で開く。閲覧可否は会社側の既存アクセス権に任せる。
+- SharePoint／OneDrive文書は、利用者が各サービスでコピーしたリンクとファイル名を登録する。
+- SharePoint／OneDrive内の自動一覧取得、文書参照用のTenant ID、Client ID、`Sites.Selected`、Drive ID、管理者同意を使用しない。
+- 案件画面の「文書を開く」は登録したSharePoint／OneDriveリンクを別画面で開く。閲覧可否は会社側の既存アクセス権に任せる。
 - リンク内の長いIDや記号を利用者が理解・入力する必要はなく、コピーしたリンクをそのまま貼り付ける。
 - 各文書ごとに「捺印対象／確認のみ」を設定する。
 - 案件詳細の対象文書一覧では、回付ルートと重複する「確認のみ」を表示しない。例外として注意が必要な「捺印対象」だけを表示する。
@@ -224,7 +224,7 @@ SharePoint／OneDriveとSMB共有を無理に同じ内部実装にしない。�
 - SharePointでコピーしたリンクを回覧へ登録し、元ファイルを別画面で直接開く。
 - 閲覧可否は会社側で設定済みのSharePointアクセス権へ任せ、アプリから権限を追加・変更しない。
 - Excel、Word、PowerPointはSharePoint／Office for the web、PDFはブラウザまたはAcrobat等で開く。
-- OneDriveもSTEP 6で同じリンク登録方式へ統合する。
+- OneDriveもSTEP 6で同じリンク登録方式へ統合済み。
 
 ### 共有フォルダ
 
@@ -272,8 +272,8 @@ Dataverse、有料DB、有料SaaS、Premium Power Automateを勝手に前提に�
 - [x] STEP 3：利用者ログイン不要の案件URL方式へ変更
 - [x] STEP 4：Microsoft Graphユーザー検索（任意機能、通常運用はローカル承認者マスタ）
 - [x] STEP 5：SharePointリンク登録と実ファイル起動
-- [ ] STEP 6：OneDriveリンク登録
-- [ ] STEP 7：OneDrive／共有フォルダの実ファイル起動
+- [x] STEP 6：OneDriveリンク登録
+- [ ] STEP 7：会社環境でのOneDrive実ファイル確認／共有フォルダ起動
 - [ ] STEP 8：会社PCバックエンドへ回覧情報保存
 - [ ] STEP 9：実ユーザーで実際の回覧
 - [ ] STEP 10：実データでNG・差し戻し
@@ -323,11 +323,11 @@ b33d91c Docs公開デモの注意事項を追加
 5eb5a3c Initial社内承認回覧UIモック
 ```
 
-公開版はダミーデータだけを使う画面確認用。個人情報はダミー。会社本番運用にはまだ使わない。
+公開版はダミーデータだけを使う画面確認用。個人情報はダミー。実際の会社情報やSharePoint／OneDriveリンクを登録せず、会社本番運用にはまだ使わない。
 
 ## 12. 現在のGit状態（非常に重要）
 
-2026-08-30にSTEP 5を管理者設定不要のSharePointリンク方式へ変更し、機能コミット`e444f70`を`main`へpush済み。GitHub Actions `33318214052`のPagesビルド・配信成功と公開版の表示を確認した。この文書の完了状態更新を含め、次回再開時の`git status --short`は空であることが正常。
+2026-08-31にSTEP 6のOneDriveリンク登録を実装し、機能コミット`d316616`を`main`へpush済み。GitHub Actions `33392841585`のPagesビルド・配信成功と公開版の表示を確認した。この文書の完了状態更新を含め、次回再開時の`git status --short`は空であることが正常。
 
 今後も未確認の変更がある場合は、リセット、checkout、削除で破棄しない。
 
@@ -462,11 +462,40 @@ b33d91c Docs公開デモの注意事項を追加
 - `e444f70`のGitHub Actions `33318214052`でPagesビルド・配信成功。
 - 公開版で「SharePointリンクを追加」、入力項目がリンクとファイル名だけであること、確認用SharePoint URLから日本語ファイル名が自動入力されることを確認。実在する社内リンクや情報は使用していない。
 
-## 16. 次に再開時に行うこと
+## 16. STEP 6で実装・確認した内容
 
-1. `git status --short`が空で、`git log --oneline -5`にSTEP 5のSharePointリンク方式完成コミットがあることを確認する。
-2. STEP 5は管理者設定不要のリンク方式として、実装・検証・コミット・push・GitHub Pages反映まで完了済みとして扱う。
-3. ユーザー確認後、別の区切りでSTEP 6「OneDriveリンク登録」へ進む。SharePointと同じリンク入力画面へ統合する。
+機能コミット：`d316616 OneDriveリンク登録を追加`
+
+### 最新の実装
+
+- 保存場所で「OneDrive」を選ぶと「OneDriveリンクを追加」を表示。
+- SharePointとOneDriveで同じ小さなリンク入力画面を共用し、表示名だけを保存場所に合わせて切り替える。
+- 会社のOneDriveで使われる`https://*-my.sharepoint.com/`形式と、`https://1drv.ms/`、`https://onedrive.live.com/`形式を登録可能。
+- URL内にファイル名が含まれる場合は日本語を含めて自動入力し、短縮共有リンクではファイル名を手入力する。
+- 同じOneDriveリンクの重複登録を防止。
+- 1案件へ複数リンクを追加し、文書ごとの「捺印対象／確認のみ」を維持。
+- 回覧開始とメール確認後もOneDriveリンクを案件へ保持し、「文書を開く」を別画面リンクとして表示。
+- OneDriveの確認用ダミーファイル一覧と、不要になった`ONEDRIVE_DRIVE_ID`環境変数を削除。
+- OneDrive文書参照にGraph API、Drive ID、Tenant ID、Client ID、管理者同意を使用しない。
+
+### 確認内容
+
+- OneDrive for Business形式の確認用URLから`設備投資申請書.xlsx`が自動入力されること。
+- `1drv.ms`短縮リンクへファイル名を手入力して追加できること。
+- Excel文書2件の追加、同一リンクの重複防止、OneDrive以外のURL拒否。
+- ルートテンプレートを読み込み、回覧開始メールの確認後に案件へ2件のリンクが保持されること。
+- 案件画面の2つのリンク先が登録URLと一致し、どちらも別画面指定になっていること。
+- SharePointリンク入力と共有フォルダの確認用選択画面が従来どおり表示されること。
+- `pnpm typecheck`、`pnpm test`、会社PC向けビルド、Pages向けビルド、`git diff --check`成功。
+- 実ブラウザで横方向のはみ出しと警告・エラーログがないことを確認。
+- `d316616`のGitHub Actions `33392841585`でPagesビルド・配信成功。
+- 公開版で「OneDriveリンクを追加」、リンクとファイル名だけの入力画面、日本語ファイル名の自動入力を確認。実在する社内リンクや情報は使用していない。
+
+## 17. 次に再開時に行うこと
+
+1. `git status --short`が空で、`git log --oneline -5`にSTEP 6のOneDriveリンク登録完成コミットがあることを確認する。
+2. STEP 6は管理者設定不要のリンク方式として、実装・検証・コミット・push・GitHub Pages反映まで完了済みとして扱う。
+3. ユーザー確認後、別の区切りでSTEP 7「会社環境でのOneDrive実ファイル確認／共有フォルダ起動」へ進む。
 4. Microsoft 365管理者への問い合わせを前提にしない。Graph社内名簿検索は任意のまま保留し、通常運用はローカル承認者マスタで進める。
 
 ```powershell
@@ -480,7 +509,7 @@ pnpm build
 pnpm dev
 ```
 
-## 17. 任意のGraph社内名簿検索を使う場合だけ必要なもの
+## 18. 任意のGraph社内名簿検索を使う場合だけ必要なもの
 
 - Directory（Tenant）ID
 - Application（Client）ID
@@ -490,7 +519,7 @@ pnpm dev
 - 会社PC側の秘密鍵ファイルのパス
 - 証明書のSHA-256拇印
 
-これらは任意のGraph社内名簿検索を有効にする場合だけ必要。管理者へ依頼しない通常運用では設定しない。SharePoint文書リンクの登録・閲覧には不要。
+これらは任意のGraph社内名簿検索を有効にする場合だけ必要。管理者へ依頼しない通常運用では設定しない。SharePoint／OneDrive文書リンクの登録・閲覧には不要。
 
 秘密鍵ファイルやクライアントシークレットをチャットへ貼らせない。`.env`もGitへコミットしない。
 
@@ -513,7 +542,7 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 
 会社LANの別PCから使う段階では、`APP_HOST=0.0.0.0`、Windowsファイアウォール、固定IPまたは社内DNS、許可接続元を社内管理者と設定する。
 
-## 18. データモデル上の重要事項
+## 19. データモデル上の重要事項
 
 - 主要型は`src/types.ts`。
 - `Approver`、`RouteMember`、`RouteTemplate`、`HistoryEntry`、`CaseDocument`、`CirculationCase`、`AppData`、`MockFile`。
@@ -523,30 +552,32 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - 案件開始時に氏名、メール、部門、捺印要否を案件メンバーへスナップショット保存する。
 - 承認者マスタが変更されても過去案件の履歴表示を変えない。
 - 1案件に`documents: CaseDocument[]`を持つ。
-- SharePointリンク方式では`CaseDocument.fileId`へアプリ内のランダムID、`fileUrl`へコピーしたSharePointリンクを保存する。
+- SharePoint／OneDriveリンク方式では`CaseDocument.fileId`へアプリ内のランダムID、`fileUrl`へコピーした文書リンクを保存する。
 - 案件に`accessKey`を持つ。
 - STEP 1のLocalStorageキーは`circlia-step1-v1`。内部旧名だが、データ移行なしで不用意に変更しない。
 
-## 19. 現時点の制約
+## 20. 現時点の制約
 
 - 案件、テンプレート、履歴はまだブラウザのLocalStorage。
 - 選択した開始者も現在のブラウザだけに保持される。別PC、別ブラウザ、プライベートブラウズ、ブラウザデータ消去後は再選択が必要。
 - 複数PC間で案件データを共有できない。
 - GitHub Pages版はバックエンドを持たず、Graph検索や実メール送信をしない。
-- SharePoint文書は自動一覧取得せず、利用者がコピーしたリンクを登録する。
-- リンクを開いた後の閲覧可否はSharePoint側の既存アクセス権に従う。
-- SharePointへ未ログインの場合は、SharePoint側で会社アカウントのログインを求められる場合がある。
-- OneDrive、SharePoint Lists未接続。
+- SharePoint／OneDrive文書は自動一覧取得せず、利用者がコピーしたリンクを登録する。
+- リンクを開いた後の閲覧可否はMicrosoft 365側の既存アクセス権に従う。
+- Microsoft 365へ未ログインの場合は、リンク先で会社アカウントのログインを求められる場合がある。
+- 会社環境の実ファイルを使ったOneDrive起動確認は未実施。
+- SharePoint Lists未接続。
 - メール送信はUIデモ。
 - PDF捺印有無の自動判定なし。
 - 同時更新、排他制御、ネットワーク障害対策、監査ログ本番化は未実装。
 - 本人認証なしのため、案件URLを持つ人が操作できる。
 - Graphキャッシュは既定5分、上限5,000名。大規模テナントでは再設計が必要。
 
-## 20. やってはいけないこと
+## 21. やってはいけないこと
 
 - いきなり全STEPを実装しない。
 - STEP 5未完了のままSTEP 6へ進まない。
+- STEP 6未完了のままSTEP 7へ進まない。
 - 本人認証やMicrosoft 365利用者ログインを勝手に復活させない。
 - URL方式を個人アカウント方式へ変更しない。
 - `mailto:`方式へ戻さない。
@@ -560,7 +591,7 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - 未コミット変更を破棄しない。
 - ユーザーの明示なしに別GitHubリポジトリへpushしない。
 
-## 21. STEP完了報告の形式
+## 22. STEP完了報告の形式
 
 各STEP完了時は次を報告する。
 
@@ -580,7 +611,7 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 
 - 次の1STEPだけを説明し、ユーザーが確認できる状態で一度停止。
 
-## 22. 参照すべきファイル
+## 23. 参照すべきファイル
 
 - `README.md`：一般向け説明と起動手順
 - `HANDOFF_PROMPT.md`：新しいスレッドへ貼る開始プロンプト
@@ -598,10 +629,10 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 - `.env.example`：秘密情報を含まない設定例
 - `package.json`：起動・検証コマンド
 
-## 23. 代表的な回帰確認操作
+## 24. 代表的な回帰確認操作
 
 1. 承認者を氏名・メール・部門で検索し追加。
-2. SharePointリンクを複数追加し、文書ごとの捺印要否を設定。
+2. SharePoint／OneDriveリンクを複数追加し、文書ごとの捺印要否を設定。
 3. 回付ルートを作成、並べ替え、捺印要否変更。
 4. ルート保存、読み込み、上書き、複製。
 5. 回覧開始し、案件URLと現在確認者を確認。
@@ -613,4 +644,4 @@ GRAPH_DIRECTORY_MAX_USERS=5000
 11. 最後まで回覧完了。
 12. スマホ幅でもホーム上部の2ボタン、案件一覧、回付ルートの番号・処理ラベル・文字ボタンの配置を確認。
 
-この一連とローカル承認者マスタを維持した状態で、STEP 5のSharePointリンク登録・実ファイル起動が使えるのが正しい完成形です。
+この一連とローカル承認者マスタを維持した状態で、STEP 6のSharePoint／OneDriveリンク登録・文書起動が使えるのが正しい完成形です。
